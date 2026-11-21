@@ -39,7 +39,8 @@ export const LEAVE_LABEL = {
 
 // זריקה "נקייה" = בוצעה כמו שתוכנן. רק היא נכנסת לקריאת המסלול
 // פספוס עם בורד ידוע נחשב נקי לקריאה: אנחנו יודעים בדיוק מה הכדור עשה
-export const isClean = s => !s.exec || s.exec === 'ok' || s.actualKnown;
+// זריקה "ישר/חזק מדי" = הזריקה השתנתה, לא המסלול. לכן היא לא נקייה גם אם עברה בחץ
+export const isClean = s => !s.straight && (!s.exec || s.exec === 'ok' || s.actualKnown);
 
 export function laneStats(shots, lane, hand) {
   const firstAll = shots.filter(s => s.shot === 0 && s.lane === lane && s.rack.length === 10);
@@ -55,7 +56,8 @@ export function laneStats(shots, lane, hand) {
   const allStrikes = firstAll.filter(s => !s.left.length).length;
   return {
     n: firstAll.length, clean: first.length, exec, firstAll,
-    onTargetPct: pct(first.length, firstAll.length),
+    onTargetPct: pct(first.length, firstAll.filter(s => !s.straight).length),
+    straightN: firstAll.filter(s => s.straight).length,
     strikes: allStrikes,
     strikePct: pct(allStrikes, firstAll.length),
     spareN: spares.length,
@@ -193,6 +195,25 @@ export function insights(shots, lane, hand, session) {
     out.push({ level, title: `מרחב טעות ${dw}`, seen: `${ms.length} זריקות יצאו ${dw} מהיעד: ${good} סטרייקים, ${hi} כניסות גבוהות, ${lo} חלשות או פספוס.`, means, todo: 'כשתבחר קו, העדף קו שהטעויות שלך בו "נסלחות". זה הקו שיחזיק לאורך משחק שלם.', why: 'שחקנים מקצועיים לא מחפשים רק את הקו הכי טוב, אלא את הקו עם הכי הרבה מרחב טעות.' });
   };
   missRoom('out'); missRoom('in');
+
+  // 0ב. נטייה לזרוק ישר/חזק: מי השתנה, אתה או המסלול?
+  const strS = all.firstAll.filter(s => s.straight);
+  if (strS.length >= 2) {
+    const bpS = r1(median(nums(strS, 'bp'))), bpN = all.bp;
+    const k = strS.map(s => classifyLeave(s, hand));
+    const st = k.filter(c => c === 'strike').length, bad = k.filter(c => ['light', 'weak10', 'head', 'brooklyn', 'high'].includes(c)).length;
+    // באיזה מצב זה קורה: אחרי מסגרת בלי סטרייק, או בסוף משחק
+    const firsts = shots.filter(s => s.shot === 0 && s.rack.length === 10);
+    const afterMiss = strS.filter(s => { const i = firsts.indexOf(s); return i > 0 && firsts[i - 1].left.length > 0; }).length;
+    const late = strS.filter(s => (s.frame ?? 0) >= 7).length;
+    const when = strS.length >= 3 && afterMiss / strS.length >= 0.67 ? ' רוב הפעמים זה קרה מיד אחרי מסגרת בלי סטרייק.' : strS.length >= 3 && late / strS.length >= 0.67 ? ' רוב הפעמים זה קרה בסוף המשחק (מסגרת 8 והלאה).' : '';
+    const bpTxt = bpS != null && bpN != null ? ` השבירה בזריקות האלה: בורד ${bpS} בממוצע, לעומת ${bpN} בזריקות הרגילות שלך.` : '';
+    out.push({ level: strS.length / all.n >= 0.25 ? 'warn' : 'info', title: 'נטייה: זריקה ישרה/חזקה',
+      seen: `${strS.length} מתוך ${all.n} זריקות סימנת "ישר/חזק מדי": ${st} סטרייקים, ${bad} כניסות לא טובות.${bpTxt}${when}`,
+      means: 'בזריקות האלה הזריקה השתנתה, לא המסלול. לכן הן לא נכנסות לקריאת המסלול ולא גורמות להמלצה לזוז.',
+      todo: when.includes('אחרי מסגרת') ? 'אחרי מסגרת פתוחה: נשימה, אותו קצב הליכה ואותו שחרור. לא "לתקן" בכוח.' : when.includes('בסוף') ? 'בסוף המשחק: אותה שגרה כמו במסגרת הראשונה. הלחץ מוסיף מהירות בלי שמרגישים.' : 'לפני הזריקה: קצב הליכה רגיל, יד רפויה, ולתת לכדור להתגלגל מהיד ולא "לדחוף" אותו.',
+      why: 'קודם בודקים מי השתנה, אתה או המסלול, ורק אחר כך זזים. הזזה בגלל זריקה חריגה מקלקלת את הזריקה הרגילה הבאה.' });
+  }
 
   // 1. עקביות קודם
   if (recent.bpStd !== null && recent.bpStd > 3 && nums(R, 'bp').length >= 4) {
@@ -445,6 +466,7 @@ const SRC = [
   ['צריך עוד', ['estimate']],
   ['קודם דיוק', ['principle', 'estimate'], 'עקביות לפני קריאה: Bowling This Month, NBA'],
   ['מרחב טעות', ['data']],
+  ['נטייה: זריקה ישרה', ['data', 'principle'], 'עקביות לפני קריאה: Bowling This Month, NBA'],
   ['השבירה מפוזרת', ['principle', 'estimate']],
   ['המהירות קופצת', ['principle'], 'מהירות מאריכה את ההחלקה: Bowlingball.com, USBC'],
   ['הדריפט משתנה', ['principle'], 'החלקה עקבית = שחרור עקבי: National Bowling Academy'],

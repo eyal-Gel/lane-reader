@@ -224,7 +224,7 @@ function initEntry(s, ctx, game) {
     bp: isFirst && !plan ? prev?.bp ?? null : null,
     speed: prev?.speed ?? '',
     quality: null,
-    exec: 'ok', miss: 'ok', actual: null,
+    exec: 'ok', miss: 'ok', actual: null, straight: false,
   };
   // סיום רגל: שומרים את הדריפט האחרון שסימנת בצד הזה, אחרת הדריפט הרגיל מההגדרות
   const lastDrift = [...segShots].reverse().find(x => x.lane === lane && x.finishSet && Number.isFinite(x.stance?.board));
@@ -305,6 +305,7 @@ export function renderPlay() {
       <div class="chips" id="qChips">${[['light', 'חלש'], ['pocket', 'כיס'], ['high', 'גבוה'], ['brooklyn', 'ברוקלין'], ['strong10', S.getDb().settings.hand === 'L' ? '7 חזק (4 עף מסביב)' : '10 חזק (6 עף מסביב)']].map(([v, t]) => `<button data-v="${v}" class="${entry.quality === v ? 'on' : ''}">${t}</button>`).join('')}</div>` : ''}
       <label>פגעת בחץ שרצית?</label>
       <div class="chips" id="xChips">${[['ok', '✓ פגעתי בחץ שרציתי'], ['left', 'יצא שמאלה מהחץ'], ['right', 'יצא ימינה מהחץ'], ['unsure', 'לא בטוח']].map(([v, t]) => `<button data-v="${v}" class="${entry.miss === v ? 'on' : ''}">${t}</button>`).join('')}</div>
+      <div class="chips"><button id="straightTog" class="${entry.straight ? 'on warnc' : ''}">↯ זרקתי ישר/חזק מדי</button></div>
       <div id="actualRow" class="actual" ${entry.miss === 'left' || entry.miss === 'right' ? '' : 'hidden'}>
         <span>באיזה בורד הכדור עבר? (אם זוכר)</span>
         <div class="ctr"><button data-act="-1">−</button><b id="v-act">${entry.actual ?? '—'}</b><button data-act="1">+</button><button class="forget" data-act="0">לא זוכר</button></div>
@@ -376,6 +377,7 @@ export function renderPlay() {
     $('#actualRow').hidden = !['left', 'right'].includes(entry.miss);
     $('#v-act').textContent = entry.actual ?? '—';
   });
+  $('#straightTog').onclick = e => { entry.straight = !entry.straight; e.currentTarget.classList.toggle('on', entry.straight); e.currentTarget.classList.toggle('warnc', entry.straight); };
   root.querySelectorAll('#actualRow [data-act]').forEach(btn => btn.addEventListener('click', () => {
     const d = Number(btn.dataset.act);
     if (!d) entry.actual = null;
@@ -427,6 +429,7 @@ function saveShot(s, ctx, game) {
     sessionId: s.id, seg: S.curSegIdx(s), game, frame: ctx.frame, shot: ctx.shot, lane: entry.lane,
     ball: entry.ball, stance: { ...entry.stance }, finish: entry.finish, finishSet: !!entry.finishSet, arrow: entry.arrow, bp: entry.bp,
     speed: entry.speed === '' ? null : Number(entry.speed), quality: entry.quality, exec: entry.exec,
+    ...(entry.straight ? { straight: true } : {}),
     // אם ידוע באיזה בורד הכדור עבר: החץ = מה שקרה בפועל, והיעד נשמר בנפרד
     ...(entry.actual != null && entry.exec !== 'ok' ? { target: entry.arrow, arrow: entry.actual, actualKnown: true } : {}),
     rack: [...ctx.rack], left: [...entry.left].sort((a, b) => a - b),
@@ -438,7 +441,9 @@ function saveShot(s, ctx, game) {
   const evs = updateRecs(s);
   const evHtml = evs.map(e => `<div style="margin-top:6px">${esc(eventText(e))}</div>`).join('');
   if (s.liveTips === false && !ctx.warm) { toast('נרשם ✓', 1200); entryKey = ''; renderPlay(); return; }
-  if (ctx.rack.length === 10 && shot.exec !== 'ok') {
+  if (ctx.rack.length === 10 && shot.straight) {
+    toast('נרשם כזריקה ישרה/חזקה. היא נכנסת לניקוד ולכרטיס "נטייה", אבל לא לקריאת המסלול: הפעם השתנתה הזריקה, לא המסלול.');
+  } else if (ctx.rack.length === 10 && shot.exec !== 'ok') {
     const side = entry.miss === 'left' ? 'שמאלה' : 'ימינה';
     toast(shot.exec === 'unsure' ? 'נרשם. זריקה שלא בטוח לגביה לא נכנסת לקריאת המסלול, רק לניקוד.'
       : shot.actualKnown ? `נרשם: כיוונת ל${arrowNum(shot.target) ? `חץ ${arrowNum(shot.target)} (בורד ${shot.target})` : `בורד ${shot.target}`}, הכדור עבר בבורד ${shot.arrow} (${side}). הזריקה נכנסת לקריאה לפי מה שקרה בפועל, וגם למרחב הטעות.`
