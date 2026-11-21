@@ -1,23 +1,26 @@
 // מסכי קריאה, ארסנל, עוד (היסטוריה+הגדרות), לימוד
 import * as S from './store.js';
-import { laneStats, oilEstimate, oilLabel, insights, compareLanes, startAdvice, LEAVE_LABEL } from './analysis.js';
+import { laneStats, oilEstimate, oilLabel, insights, compareLanes, startAdvice, LEAVE_LABEL, sourceOf, SRC_LABEL } from './analysis.js';
 import { esc, go, toast, renderPlay } from './app.js';
 import { LEARN_HTML } from './learn.js';
 import { arrowNum, MOVE_INFO, geometry } from './geometry.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
-export const APP_VERSION = '1.3.1';
+export const APP_VERSION = '1.4';
 let readScope = 'seg';   // seg | session
 let unlocked = null;     // מזהה אימון שנפתח למרות מצב רישום בלבד
 
 const insHtml = i => `<div class="ins ${i.level}"><h4>${esc(i.title)}</h4>
   <p><b>מה ראינו:</b> ${esc(i.seen)}</p><p><b>מה זה אומר:</b> ${esc(i.means)}</p>
-  <p><b>מה לעשות:</b> ${esc(i.todo)}</p>${i.moves?.length ? movesTable(i.moves, i.rec) : ''}<p><b>למה:</b> ${esc(i.why)}</p></div>`;
+  <p><b>מה לעשות:</b> ${esc(i.todo)}</p>${i.moves?.length ? movesTable(i.moves, i.rec) : ''}<p><b>למה:</b> ${esc(i.why)}</p>${srcLine(i.title)}</div>`;
+
+// מקור ורמת ביטחון: כדי שתדע על מה לסמוך
+const srcLine = title => { const s = sourceOf(title); return `<div class="src">${s.kinds.map(k => `<span class="tag ${k}">${SRC_LABEL[k]}</span>`).join('')}${s.ref ? `<span class="ref">${esc(s.ref)}</span>` : ''}</div>`; };
 
 // השוואת שלוש ההזזות: מה כל אחת עושה לזווית ולשבירה
 const movesTable = (moves, rec) => `<table class="moves"><thead><tr><th>הזזה</th><th>עמידה</th><th>חץ</th><th>זווית</th><th>שבירה צפויה</th></tr></thead><tbody>
   ${moves.map(m => `<tr class="${m.type === rec ? 'rec' : ''}"><td>${m.type === rec ? '✓ ' : ''}${esc(m.name)}</td><td>${m.stance}</td><td>${arrowNum(m.arrow) ? `חץ ${arrowNum(m.arrow)}` : m.arrow}</td><td>${m.launch}</td><td>${m.bp}</td></tr>`).join('')}
-  </tbody></table><p class="mute" style="font-size:.8rem">${esc(MOVE_INFO[rec].what)}</p>`;
+  </tbody></table><p class="mute" style="font-size:.8rem">${esc(MOVE_INFO[rec].what)} השבירה הצפויה היא הערכה גאומטרית של האפליקציה, מכוילת לזריקות שלך.</p>`;
 
 // ---------- קריאה ----------
 export function renderRead() {
@@ -69,7 +72,7 @@ export function renderRead() {
       </div>
       ${geoLine(st)}
       ${st.n - st.clean ? `<div class="mute" style="margin-top:6px">${st.n - st.clean} זריקות לא נכללו בקריאת המסלול (פספוס יעד או לא בטוח). הן נספרות רק בניקוד ובמרחב הטעות. דיוק: ${st.onTargetPct}%.</div>` : ''}
-      ${oil ? `<div style="margin-top:12px"><div class="mute">אורך שימון משוער (כלל ה-31)</div>
+      ${oil ? `<div style="margin-top:12px"><div class="mute">אורך שימון משוער (כלל ה-31: כלל אצבע מקובל, לא מדידה)</div>
         <div class="oil">~${oil.len} רגל <small class="mute" style="font-size:.8rem">(${oil.lo}-${oil.hi}, ביטחון ${oil.conf}, ${oil.n} זריקות)</small></div>
         <div class="mute">${oilLabel(oil.len)}${s.patternLen ? ` · התבנית המוצהרת: ${s.patternLen} רגל (שבירה צפויה בבורד ${s.patternLen - 31})` : ''}${seg.oil === 'dry' ? ' · ⚠️ מסלול יבש: ההערכה פחות אמינה' : ''}</div></div>` : ''}
       ${bpChart(st.first)}
@@ -204,8 +207,8 @@ function sandLine(b) {
   const l = S.lastSanded(b);
   if (!l) return `<div class="mute" style="font-size:.78rem">משטח ${esc(b.grit || '?')}${b.factoryGrit ? ` (מהמפעל ${esc(b.factoryGrit)})` : ''} · לחץ "שייפתי" אחרי השיוף הבא כדי להתחיל לעקוב</div>`;
   const days = Math.round((Date.now() - Date.parse(l.date)) / 864e5), g = S.gamesSinceSand(b);
-  const worn = g >= 25 || days >= 35;
-  return `<div class="mute" style="font-size:.78rem;${worn ? 'color:var(--warn)' : ''}">שויף ל-${esc(l.grit)} ${days ? `לפני ${days} ימים` : 'היום'} · ~${g} משחקים מאז${worn ? ' · המשטח כנראה כבר התחלק' : ''}</div>`;
+  const worn = g >= 30 || days >= 35;
+  return `<div class="mute" style="font-size:.78rem;${worn ? 'color:var(--warn)' : ''}">שויף ל-${esc(l.grit)} ${days ? `לפני ${days} ימים` : 'היום'} · ~${g} משחקים מאז${g >= 60 ? ' · הגיע הזמן לשיוף מלא (Storm: כל 60-80 משחקים)' : worn ? ' · כדאי לבדוק אם המשטח התחלק' : ''}</div>`;
 }
 
 // ---------- עוד: היסטוריה + הגדרות ----------

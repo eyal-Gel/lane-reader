@@ -27,7 +27,8 @@ export function classifyLeave(shot, hand) {
   if (has(4) && !has(2) && !has(5) && !has(8)) return 'high';
   // 7 בודד לא חד-משמעי: יכול לבוא מכניסה גבוהה או מכניסה שטוחה (פין 4 עף ישר)
   if (L.length === 1 && has(7)) return 'ambig';
-  if (has(7) && has(10) && L.length === 2) return 'high';
+  // 7-10 בכיס לא חד-משמעי: מקורות מקשרים אותו גם לכדור חזק שפוגע קצת חלש
+  if (has(7) && has(10) && L.length === 2) return 'ambig';
   if (has(2) || has(5) || has(8)) return 'light';
   return 'other';
 }
@@ -86,7 +87,8 @@ export function oilEstimate(st) {
 }
 
 export function oilLabel(len) {
-  if (len <= 37) return 'תבנית קצרה: הכדור יתעורר מוקדם. משחקים יותר פנימה עם קווים ישרים יחסית';
+  // חלוקה מקובלת: קצרה עד 35 רגל, בינונית 36-42, ארוכה 43 ומעלה
+  if (len <= 35) return 'תבנית קצרה: הכדור יתעורר מוקדם. משחקים יותר פנימה עם קווים ישרים יחסית';
   if (len <= 42) return 'תבנית בינונית: התבנית הנפוצה במצב ליגה. יש לך גמישות בבחירת הקו';
   return 'תבנית ארוכה: הכדור מחליק הרבה. צריך יותר ישר עם כדור חזק, ופחות מקום לטעויות החוצה';
 }
@@ -123,8 +125,10 @@ function wornNote(id) {
   const b = ballById(id), l = lastSanded(b);
   if (!l) return '';
   const g = gamesSinceSand(b), days = Math.round((Date.now() - Date.parse(l.date)) / 864e5);
-  if (g < 25 && days < 35) return '';
-  return `שים לב: ${b.name} שויף ל-${l.grit} לפני ${days} ימים (~${g} משחקים). המשטח כנראה כבר התחלק, והכדור חלש ממה שהוא היה. ייתכן שזו כל הבעיה, ושיוף יחזיר לו אחיזה.`;
+  // Storm: שיוף מלא כל 60-80 משחקים. ריענון משטח מומלץ בערך כל 30
+  if (g < 30 && days < 35) return '';
+  const full = g >= 60;
+  return `שים לב: ${b.name} שויף ל-${l.grit} לפני ${days} ימים (~${g} משחקים רשומים). ${full ? 'לפי ההמלצה של Storm (שיוף מלא כל 60-80 משחקים) הגיע הזמן לשיוף.' : 'ייתכן שהמשטח כבר התחלק קצת, והכדור חלש ממה שהיה. ריענון משטח יכול להחזיר אחיזה.'} בדוק את זה לפני שאתה מזיז את הקו.`;
 }
 
 // ---------- תובנות ----------
@@ -230,12 +234,17 @@ export function insights(shots, lane, hand, session) {
   // 10 חזק: לרוב זריקה טובה. מגיבים רק כשזה חוזר
   if (strong10 >= 3 && strong10 / n >= 0.3) {
     const m = moveBlock('strong10', R.filter(s => classifyLeave(s, hand) === 'strong10'));
+    const sp10 = nums(R.filter(s => classifyLeave(s, hand) === 'strong10'), 'speed'), spAll = nums(R, 'speed');
+    const fast = sp10.length >= 2 && spAll.length >= 4 && median(sp10) > median(spAll) + 0.5;
+    const altW = pickBall(lastBall, false);
     out.push({
       level: 'warn', title: '10 חזק חוזר',
-      seen: `${strong10} פעמים מתוך ${n} פין 6 עף חזק מסביב ל-10 והשאיר אותו עומד.`,
-      means: 'הכדור מגיע לכיס עם יותר מדי אנרגיה או זווית, בדרך כלל קצת גבוה. פין 6 נזרק מהדופן ועף מעל ה-10 במקום דרכו. 10 חזק אחד או שניים הם בדרך כלל זריקה טובה וחוסר מזל.',
-      todo: m.text + ' אפשרות נוספת: קצת יותר מהירות, או כדור מתון יותר עם משטח מט, שמתחיל להתגלגל מוקדם ומגיע לכיס עם תגובה רכה יותר.',
-      why: m.ch.reason, moves: m.opts, rec: m.ch.type,
+      seen: `${strong10} פעמים מתוך ${n} פין 6 עף חזק מסביב ל-10 והשאיר אותו עומד.${fast ? ` בזריקות האלה המהירות הייתה גבוהה מהרגיל (${r1(median(sp10))}).` : ''}`,
+      means: 'שתי סיבות מוכרות: זווית כניסה חדה מדי (פין 3 פוגע ביותר מדי מפין 6 ומעיף אותו מסביב ל-10), או קצת יותר מדי מהירות. 10 חזק אחד או שניים הם בדרך כלל זריקה טובה וחוסר מזל.',
+      todo: (fast ? 'קודם כול האט מעט: אצלך ה-10 החזק מגיע דווקא בזריקות המהירות. ' : '') +
+        `כדי לסגור קצת את הזווית: ${m.text}` + (altW ? ` או כדור חלק יותר: ${altW.name}.` : ''),
+      why: m.ch.reason + ' לפי מקורות ההדרכה, ל-10 חזק ול-10 חלש יש סיבות שונות ותיקונים שונים, ולכן חשוב לסמן נכון איזה מהם היה.',
+      moves: m.opts, rec: m.ch.type,
     });
   }
 
@@ -375,4 +384,36 @@ export function openingPlan(shots, lane, hand, session) {
     return { ...base, stance: r.stance, arrow: r.arrow, reason: `בחימום: ${mv.title}. לכן מתחילים אחרי הזזת ${r.name}, עם שבירה צפויה בבורד ${r.bp}.${alt ? ' אם זה לא מסתדר אחרי 2-3 פריימים, ההמלצה בלשונית קריאה כוללת גם כדור חלופי.' : ''}` };
   }
   return { ...base, reason: st.strikePct >= 40 ? 'החימום הלך טוב בקו הזה. מתחילים בדיוק ממנו.' : 'אין עדיין דפוס ברור. מתחילים מהקו של החימום ושמים לב לשלוש הזריקות הראשונות.' };
+}
+
+// ---------- מקור ורמת ביטחון לכל תובנה ----------
+// principle = עיקרון מקובל בהדרכת באולינג, estimate = הערכה/ספים של האפליקציה, data = מחושב מהזריקות שלך
+const SRC = [
+  ['צריך עוד', ['estimate']],
+  ['קודם דיוק', ['principle', 'estimate'], 'עקביות לפני קריאה: Bowling This Month, NBA'],
+  ['מרחב טעות', ['data']],
+  ['השבירה מפוזרת', ['principle', 'estimate']],
+  ['המהירות קופצת', ['principle'], 'מהירות מאריכה את ההחלקה: Bowlingball.com, USBC'],
+  ['הדריפט משתנה', ['principle'], 'החלקה עקבית = שחרור עקבי: National Bowling Academy'],
+  ['אתה בקו', ['data']],
+  ['מתעורר מוקדם', ['principle', 'estimate'], 'קריאת השארות והזזות 2:1 / מקבילית: NBA, Bowling.com'],
+  ['לא פונה מספיק', ['principle', 'estimate'], 'קריאת השארות והזזות: NBA, Bowling.com'],
+  ['10 חלש', ['principle', 'estimate'], '10 חלש מול 10 חזק: Storm Bowling, Bowling This Month'],
+  ['10 חזק', ['principle', 'estimate'], '10 חזק = זווית חדה או מהירות עודפת: Storm, BTM'],
+  ['הזוויות', ['data', 'estimate']],
+  ['טרנזישן', ['principle', 'data'], 'טרנזישן ו-carry down: Bowling This Month, NBA'],
+  ['הזיז אותך', ['data']],
+  ['דומה לבסיס', ['data']],
+  ['הכי מוצלח', ['data']],
+  ['עומק העמידה', ['data', 'principle'], 'אחורה = יותר מהירות: USBC (bowl.com), BTM'],
+  ['המהירות משפיעה', ['data']],
+  ['המסלולים', ['data']],
+  ['שימון טרי', ['principle']], ['שימון משוחק', ['principle']], ['מסלול יבש', ['principle']],
+  ['עבד לך בעבר', ['data']],
+  ['שתי ידיים', ['estimate']],
+];
+export const SRC_LABEL = { principle: '📚 עיקרון מקובל', estimate: '🧪 הערכה של האפליקציה', data: '📊 מהנתונים שלך' };
+export function sourceOf(title) {
+  const hit = SRC.find(([k]) => title.includes(k));
+  return hit ? { kinds: hit[1], ref: hit[2] || '' } : { kinds: ['estimate'], ref: '' };
 }
