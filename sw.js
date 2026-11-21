@@ -1,6 +1,6 @@
 // עבודה בלי אינטרנט באולם: קודם רשת (כדי לקבל עדכונים), ואם אין, מהמטמון
 // בכל עדכון: להעלות את המספר כאן ואת APP_VERSION ב-js/views.js
-const CACHE = 'lane-reader-v12';
+const CACHE = 'lane-reader-v13';
 const FILES = ['./', 'index.html', 'styles.css', 'manifest.json', 'icon.svg',
   'js/app.js', 'js/store.js', 'js/lane.js', 'js/analysis.js', 'js/views.js', 'js/learn.js', 'js/geometry.js', 'js/onboard.js', 'js/learnloop.js'];
 

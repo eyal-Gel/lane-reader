@@ -347,6 +347,7 @@ export function renderPlay() {
     root.querySelectorAll('.depth [data-depth]').forEach(b => b.classList.toggle('on', Number(b.dataset.depth) === (entry.stance.cm ?? 0)));
     $('#v-arrow').textContent = entry.arrow ?? '—';
     $('#v-bp').textContent = entry.bp ?? '—';
+    root.querySelectorAll('.rf [data-rf]').forEach(b => b.classList.toggle('on', Number(b.dataset.rf) === entry.bp));
     const g = geometry(entry.stance.board, entry.arrow, entry.bp);
     $('#s-arrow').textContent = [arrowNum(entry.arrow) ? `חץ ${arrowNum(entry.arrow)}` : '', g.launch !== undefined ? `זווית ${g.launch}` : ''].filter(Boolean).join(' · ');
     $('#s-bp').textContent = g.swing !== undefined ? `${g.swing} מהחץ · ${g.hook} לכיס` : '';
@@ -387,6 +388,7 @@ export function renderPlay() {
     $('#v-act').textContent = entry.actual ?? '—';
   }));
   root.querySelectorAll('.depth [data-depth]').forEach(btn => btn.addEventListener('click', () => { entry.stance.cm = Number(btn.dataset.depth); draw(); syncSteppers(); }));
+  root.querySelectorAll('.rf [data-rf]').forEach(btn => btn.addEventListener('click', () => { entry.bp = Number(btn.dataset.rf); draw(); syncSteppers(); }));
   root.querySelectorAll('.stepper [data-forget]').forEach(btn => btn.addEventListener('click', () => { entry[btn.dataset.forget] = null; draw(); syncSteppers(); }));
   $('#qChips')?.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; entry.quality = entry.quality === b.dataset.v ? null : b.dataset.v; renderPlay(); });
   $('#undo').onclick = () => { if (S.undoShot(s.id)) { entryKey = ''; renderPlay(); toast('הזריקה האחרונה בוטלה'); } };
@@ -396,11 +398,14 @@ export function renderPlay() {
   $('#saveShot').onclick = () => saveShot(s, ctx, game);
 }
 
+// שבירה לפי ה-Range finders (בורד 10 ו-15, בערך 40 רגל): מה שבאמת רואים מהגישה. כל כפתור = בורד משוער
+const RF = [[8, 'חוץ'], [10, '10'], [12, 'בין'], [15, '15'], [17, 'פנים']];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 function stepper(k, lbl, v) {
   return `<div class="stepper ${k}"><div class="lbl">${lbl}</div><div class="ctr">
     <button data-k="${k}" data-d="-1">−</button><span class="val" id="v-${k}">${v ?? (k === 'cm' ? 0 : '—')}</span><button data-k="${k}" data-d="1">+</button></div>
     ${k === 'cm' ? `<div class="depth">${[[0, 'אחורה'], [20, 'אמצע'], [40, 'ספייר']].map(([v, t]) => `<button data-depth="${v}" class="${(v ?? 0) === (entry.stance.cm ?? 0) ? 'on' : ''}">${t}</button>`).join('')}</div>` : ''}
+    ${k === 'bp' ? `<div class="sub rfl">לפי הריינג' פיינדרס</div><div class="depth rf" title="ריינג' פיינדרס בבורד 10 ובבורד 15">${RF.map(([v, t]) => `<button data-rf="${v}" class="${v === entry.bp ? 'on' : ''}">${t}</button>`).join('')}</div>` : ''}
     ${k === 'fin' ? `<div class="sub" id="s-fin"></div>` : ''}
     ${k === 'arrow' || k === 'bp' ? `<div class="sub" id="s-${k}"></div><button class="forget" data-forget="${k}">לא זוכר</button>` : ''}</div>`;
 }

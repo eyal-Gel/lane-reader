@@ -137,6 +137,9 @@ textarea { min-height: 64px; resize: vertical; }
 .ball .col { display: flex; flex-direction: column; gap: 6px; }
 .depth { display: flex; gap: 4px; margin-top: 5px; }
 .depth button { flex: 1; font-size: .72rem; padding: 4px 0; border-radius: 7px; border: 1px solid var(--line); background: var(--card2); }
+.rf { margin-top: 2px; }
+.rf button { font-size: .68rem; padding: 4px 1px; white-space: nowrap; }
+.rfl { margin-top: 5px; }
 .depth button.on { background: var(--good); color: #062; border-color: var(--good); font-weight: 700; }
 .pindeck { fill: #2a2118; opacity: .35; }
 .lanepin { fill: #fbfbf7; stroke: #9a9a9a; stroke-width: 1.5; }

@@ -7,7 +7,7 @@ import { arrowNum, MOVE_INFO, geometry } from './geometry.js';
 import { registerRecs, learnedSummary, KIND_LABEL } from './learnloop.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
-export const APP_VERSION = '1.7';
+export const APP_VERSION = '1.8';
 let readScope = 'seg';   // seg | session
 let unlocked = null;     // מזהה אימון שנפתח למרות מצב רישום בלבד
 
