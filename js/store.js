@@ -1,5 +1,41 @@
 // מודל נתונים, שמירה מקומית וחישוב ניקוד
-const KEY = 'blr.v1';
+
+// ---------- פרופילי שחקנים: כל שחקן במכשיר שומר בנפרד ----------
+// הפרופיל הראשי משתמש במפתח המקורי, כדי שנתונים קיימים לא ילכו לאיבוד
+const PROF_KEY = 'blr.profiles';
+const keyFor = id => id === 'main' ? 'blr.v1' : `blr.v1.${id}`;
+function readProfiles() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PROF_KEY));
+    if (p && Array.isArray(p.list) && p.list.length) return p;
+  } catch { /* אין עדיין פרופילים */ }
+  return { cur: 'main', list: [{ id: 'main', name: 'שחקן ראשי' }] };
+}
+let profiles = readProfiles();
+if (!profiles.list.some(p => p.id === profiles.cur)) profiles.cur = 'main';
+const KEY = keyFor(profiles.cur);
+const saveProfiles = () => { try { localStorage.setItem(PROF_KEY, JSON.stringify(profiles)); } catch { /* מצב פרטי */ } };
+
+export const listProfiles = () => profiles.list.map(p => ({ ...p, current: p.id === profiles.cur }));
+export const currentProfile = () => profiles.list.find(p => p.id === profiles.cur);
+export function addProfile(name) {
+  const id = 'p' + Date.now().toString(36);
+  profiles.list.push({ id, name: String(name).slice(0, 30) });
+  saveProfiles();
+  return id;
+}
+export function renameProfile(id, name) { const p = profiles.list.find(x => x.id === id); if (p) { p.name = String(name).slice(0, 30); saveProfiles(); } }
+// מעבר שחקן: טוען מחדש את הדף עם הנתונים של השחקן השני
+export function switchProfile(id) { profiles.cur = id; saveProfiles(); location.reload(); }
+// מחיקת פרופיל (לא הנוכחי ולא הראשי) כולל כל הנתונים שלו
+export function deleteProfile(id) {
+  if (id === 'main' || id === profiles.cur) return;
+  profiles.list = profiles.list.filter(p => p.id !== id);
+  try { localStorage.removeItem(keyFor(id)); } catch { /* */ }
+  saveProfiles();
+}
+// ניקוי כל הנתונים של השחקן הנוכחי (הפרופיל עצמו נשאר)
+export function resetCurrentProfile() { try { localStorage.removeItem(KEY); } catch { /* */ } location.reload(); }
 export const ALL_PINS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 const defaults = () => ({

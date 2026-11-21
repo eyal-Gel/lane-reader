@@ -151,3 +151,6 @@ textarea { min-height: 64px; resize: vertical; }
 .actual .ctr button { width: 36px; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: var(--card); font-size: 1.1rem; }
 .actual .ctr b { min-width: 34px; text-align: center; font-size: 1.15rem; color: var(--info); }
 .actual .ctr .forget { width: auto; border: 0; background: none; text-decoration: underline; color: var(--mute); font-size: .78rem; }
+.ptag { font-size: .8rem; font-weight: 600; color: var(--acc); margin-inline-start: 6px; }
+.prof { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.prof.cur b { color: var(--acc); }

@@ -32,6 +32,8 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
 
 function renderHeader() {
   const s = S.currentSession();
+  // כשיש יותר משחקן אחד במכשיר, השם מופיע בכותרת כדי לא לרשום בטעות לשחקן הלא נכון
+  $('#playerTag').textContent = S.listProfiles().length > 1 ? `👤 ${S.currentProfile()?.name || ''}` : '';
   if (!s) { $('#sessionInfo').textContent = 'אין אימון פעיל'; return; }
   const seg = S.segOf(s, S.curSegIdx(s));
   const nums = seg.laneNums.L || seg.laneNums.R ? ` · מסלולים ${seg.laneNums.L || '?'} | ${seg.laneNums.R || '?'}` : '';

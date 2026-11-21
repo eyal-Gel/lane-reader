@@ -6,7 +6,7 @@ import { LEARN_HTML } from './learn.js';
 import { arrowNum, MOVE_INFO, geometry } from './geometry.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
-export const APP_VERSION = '1.1';
+export const APP_VERSION = '1.2';
 let readScope = 'seg';   // seg | session
 let unlocked = null;     // מזהה אימון שנפתח למרות מצב רישום בלבד
 
@@ -213,7 +213,16 @@ export function renderMore() {
   const root = $('#view-more');
   const db = S.getDb(), st = db.settings;
   const sess = [...db.sessions].reverse();
-  root.innerHTML = `<div class="card"><h2>הגדרות</h2>
+  const profs = S.listProfiles();
+  root.innerHTML = `<div class="card"><h2>👥 שחקנים במכשיר</h2>
+    <p class="mute">לכל שחקן כדורים, הגדרות ואימונים משלו. כדי לתת למישהו להתנסות, צור לו שחקן חדש. הנתונים שלך לא נוגעים.</p>
+    ${profs.map(p => `<div class="row prof ${p.current ? 'cur' : ''}" data-id="${p.id}">
+      <div class="grow"><b>${esc(p.name)}</b>${p.current ? ' <span style="color:var(--acc)">(פעיל עכשיו)</span>' : ''}</div>
+      ${p.current ? '<button class="btn sm ren">שינוי שם</button>' : `<button class="btn sm pri sw">עבור</button>${p.id === 'main' ? '' : '<button class="btn sm danger delp">🗑</button>'}`}
+    </div>`).join('')}
+    <div class="row" style="margin-top:10px"><button class="btn grow" id="addProf">+ שחקן חדש</button><button class="btn danger grow" id="resetProf">נקה את ${esc(S.currentProfile()?.name || '')}</button></div>
+  </div>
+  <div class="card"><h2>הגדרות</h2>
     <label>יד זריקה (דומיננטית)</label><div class="seg" id="hand"><button data-v="R" class="${st.hand === 'R' ? 'on' : ''}">ימין</button><button data-v="L" class="${st.hand === 'L' ? 'on' : ''}">שמאל</button></div>
     <label>סגנון</label><div class="seg" id="style"><button data-v="one" class="${st.style !== 'two' ? 'on' : ''}">יד אחת</button><button data-v="two" class="${st.style === 'two' ? 'on' : ''}">שתי ידיים</button></div>
     <p class="mute" style="margin:4px 0 0">שמאלי: הבורדים נספרים מהצד השמאלי, וזיהוי הפינים מתהפך (7 ↔ 10). שתי ידיים: ההמלצות מתחשבות בסיבוב גבוה ובפנייה חזקה יותר.</p>
@@ -247,6 +256,28 @@ export function renderMore() {
     <div class="card"><h2>גיבוי</h2><p class="mute">הנתונים שמורים רק בטלפון הזה. כדאי לייצא מדי פעם.</p>
       <div class="row"><button class="btn grow" id="exp">⬇️ ייצוא</button><label class="btn grow" style="margin:0;text-align:center;color:var(--text)">⬆️ ייבוא<input type="file" id="imp" accept=".json" hidden></label></div></div>
     <p class="mute" style="text-align:center">גרסה ${APP_VERSION}</p>`;
+  // שחקנים
+  $('#addProf', root).onclick = () => {
+    const name = (prompt('שם השחקן החדש:', 'אורח') || '').trim();
+    if (!name) return;
+    const id = S.addProfile(name);
+    if (confirm(`נוצר "${name}". לעבור אליו עכשיו?`)) S.switchProfile(id); else renderMore();
+  };
+  root.querySelectorAll('.prof .sw').forEach(b => b.onclick = () => S.switchProfile(b.closest('.prof').dataset.id));
+  root.querySelectorAll('.prof .ren').forEach(b => b.onclick = () => {
+    const p = S.currentProfile(); const name = (prompt('שם חדש:', p.name) || '').trim();
+    if (name) { S.renameProfile(p.id, name); renderMore(); }
+  });
+  root.querySelectorAll('.prof .delp').forEach(b => b.onclick = () => {
+    const p = S.listProfiles().find(x => x.id === b.closest('.prof').dataset.id);
+    if (confirm(`למחוק את "${p.name}" וכל הנתונים שלו (כדורים, הגדרות ואימונים)? אי אפשר לשחזר.`)) { S.deleteProfile(p.id); renderMore(); }
+  });
+  $('#resetProf', root).onclick = () => {
+    const p = S.currentProfile();
+    if (!confirm(`לנקות את כל הנתונים של "${p.name}": כדורים, הגדרות ואימונים? אי אפשר לשחזר.`)) return;
+    if (!confirm('בטוח? כדאי לעשות קודם "ייצוא" לגיבוי.')) return;
+    S.resetCurrentProfile();
+  };
   const seg = (id, key) => $('#' + id, root).onclick = e => { const b = e.target.closest('button'); if (!b) return; st[key] = b.dataset.v; S.save(); renderMore(); };
   seg('hand', 'hand'); seg('style', 'style'); seg('unit', 'speedUnit');
   $('#center', root).onchange = e => { st.center = e.target.value.trim(); S.save(); };
