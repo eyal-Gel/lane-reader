@@ -162,13 +162,32 @@ export function newSession(opts) {
     plan: null,                          // תוכנית פתיחה שנבנתה בסוף החימום
     games: 1,
     // קטעים: כל מעבר לזוג מסלולים אחר (או שינוי מצב שימון) פותח קטע חדש
-    segs: [{ laneNums: { L: opts.laneL || '', R: opts.laneR || '' }, oil: opts.oil || 'fresh', startGame: 0 }],
+    segs: [{ laneNums: { L: opts.laneL || '', R: opts.laneR || '' }, oil: opts.oil || 'fresh', startGame: 0, pattern: cleanPattern(opts.pattern) }],
   };
   db.sessions.push(s);
   db.currentSessionId = s.id;
   save();
   return s;
 }
+
+// ---------- תבנית שימון של האולם ----------
+// name: שם התבנית (למשל מדף התבנית של Kegel), len: אורך ברגל, vol: נפח במ"ל (לא חובה)
+export function cleanPattern(p) {
+  if (!p) return null;
+  const len = Number(p.len), vol = Number(p.vol);
+  const out = { name: String(p.name || '').trim().slice(0, 40), len: len >= 25 && len <= 60 ? Math.round(len) : null, vol: vol > 0 && vol < 100 ? Math.round(vol * 10) / 10 : null };
+  return out.len || out.name ? out : null;
+}
+// התבנית בקטע הנוכחי (או אורך שהוזן בגרסאות קודמות)
+export const patternOf = (s, segIdx) => segOf(s, segIdx)?.pattern || (s.patternLen ? { name: '', len: s.patternLen, vol: null } : null);
+export function setPattern(s, p) {
+  const seg = segOf(s, curSegIdx(s)); if (!seg) return;
+  seg.pattern = cleanPattern(p);
+  // זוכרים את התבנית האחרונה של כל אולם, כדי למלא אותה מראש בפעם הבאה
+  if (seg.pattern) (db.settings.centerPatterns ||= {})[s.center] = seg.pattern;
+  save();
+}
+export const centerPattern = center => db.settings.centerPatterns?.[center] || null;
 
 export const OIL_LABEL = { fresh: 'שימון טרי', used: 'משוחק חלקית', dry: 'יבש יחסית' };
 
@@ -177,7 +196,9 @@ export function newSegment(session, laneL, laneR, oil) {
   session.segs ||= [{ laneNums: session.laneNums, oil: 'fresh', startGame: 0 }];
   const hasShots = gameShots(session.id, session.games - 1).length > 0;
   if (hasShots) session.games++;
-  session.segs.push({ laneNums: { L: laneL, R: laneR }, oil, startGame: session.games - 1 });
+  // אותו אולם = בדרך כלל אותה תבנית, אז היא עוברת לקטע החדש
+  const prevPat = session.segs[session.segs.length - 1]?.pattern || null;
+  session.segs.push({ laneNums: { L: laneL, R: laneR }, oil, startGame: session.games - 1, pattern: prevPat });
   session.laneNums = { L: laneL, R: laneR };
   save();
 }

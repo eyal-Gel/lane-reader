@@ -7,7 +7,7 @@ import { arrowNum, MOVE_INFO, geometry } from './geometry.js';
 import { registerRecs, learnedSummary, KIND_LABEL } from './learnloop.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
-export const APP_VERSION = '1.5';
+export const APP_VERSION = '1.6';
 let readScope = 'seg';   // seg | session
 let unlocked = null;     // מזהה אימון שנפתח למרות מצב רישום בלבד
 
@@ -73,9 +73,9 @@ export function renderRead() {
       </div>
       ${geoLine(st)}
       ${st.n - st.clean ? `<div class="mute" style="margin-top:6px">${st.n - st.clean} זריקות לא נכללו בקריאת המסלול (פספוס יעד או לא בטוח). הן נספרות רק בניקוד ובמרחב הטעות. דיוק: ${st.onTargetPct}%.</div>` : ''}
-      ${oil ? `<div style="margin-top:12px"><div class="mute">אורך שימון משוער (כלל ה-31: כלל אצבע מקובל, לא מדידה)</div>
+      ${oil ? `<div style="margin-top:12px"><div class="mute">אורך שימון משוער (${oil.personal ? `הכלל האישי שלך: שבירה + ${oil.k}` : 'כלל ה-31: כלל אצבע מקובל, לא מדידה'})</div>
         <div class="oil">~${oil.len} רגל <small class="mute" style="font-size:.8rem">(${oil.lo}-${oil.hi}, ביטחון ${oil.conf}, ${oil.n} זריקות)</small></div>
-        <div class="mute">${oilLabel(oil.len)}${s.patternLen ? ` · התבנית המוצהרת: ${s.patternLen} רגל (שבירה צפויה בבורד ${s.patternLen - 31})` : ''}${seg.oil === 'dry' ? ' · ⚠️ מסלול יבש: ההערכה פחות אמינה' : ''}</div></div>` : ''}
+        <div class="mute">${oilLabel(oil.len)}${S.patternOf(s, segIdx)?.len ? ` · התבנית האמיתית: ${S.patternOf(s, segIdx).len} רגל` : ''}${seg.oil === 'dry' ? ' · ⚠️ מסלול יבש: ההערכה פחות אמינה' : ''}</div></div>` : ''}
       ${bpChart(st.first)}
       ${leaveBars(st)}
       <h3 style="margin-top:12px">קריאה</h3>

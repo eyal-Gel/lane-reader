@@ -1,5 +1,5 @@
 // מנוע קריאת מסלול: סטטיסטיקה + תובנות מלמדות (מה ראינו / מה זה אומר / מה לעשות / למה)
-import { getDb, ballById, ballStrength, isSplit, lastSanded, gamesSinceSand, recStats } from './store.js';
+import { getDb, ballById, ballStrength, isSplit, lastSanded, gamesSinceSand, recStats, patternOf, curSegIdx } from './store.js';
 import { calibrate, moveOptions, chooseMove, lineRead, arrowLabel, MOVE_INFO, bodyCfg, finishOf } from './geometry.js';
 
 const MIRROR = { 1: 1, 2: 3, 3: 2, 4: 6, 5: 5, 6: 4, 7: 10, 8: 9, 9: 8, 10: 7 };
@@ -79,11 +79,27 @@ export function laneStats(shots, lane, hand) {
 export function oilEstimate(st) {
   const bps = nums(st.first, 'bp');
   if (bps.length < 3) return null;
+  // אם כבר נלמד "כלל אישי" מאימונים עם תבנית ידועה, משתמשים בו במקום 31
+  const pr = personalRule31(), k = pr.k ?? 31;
   const s = [...bps].sort((a, b) => a - b);
   const q1 = s[Math.floor(s.length * 0.25)], q3 = s[Math.floor(s.length * 0.75)];
-  const len = Math.round(median(bps) + 31);
+  const len = Math.round(median(bps) + k);
   const conf = bps.length >= 8 && q3 - q1 <= 3 ? 'גבוה' : bps.length >= 5 && q3 - q1 <= 5 ? 'בינוני' : 'נמוך';
-  return { len, lo: Math.round(q1 + 31), hi: Math.round(q3 + 31), conf, n: bps.length };
+  return { len, lo: Math.round(q1 + k), hi: Math.round(q3 + k), conf, n: bps.length, k, personal: pr.k !== null };
+}
+
+// הכלל האישי: מאימונים שבהם אורך התבנית היה ידוע, מה ההפרש האמיתי בין האורך לבורד השבירה שלך
+// (אצל רוב השחקנים בערך 31, אבל מהירות, סיבוב וכדור מזיזים אותו). עדיף שימון טרי, שם הכלל הכי מדויק
+export function personalRule31() {
+  const db = getDb(), all = [];
+  db.sessions.forEach(s => (s.segs || [{}]).forEach((seg, i) => {
+    const len = seg?.pattern?.len ?? (i === 0 ? s.patternLen : null);
+    if (!len) return;
+    db.shots.filter(x => x.sessionId === s.id && (x.seg ?? 0) === i && x.shot === 0 && x.rack.length === 10 && isClean(x) && x.bp != null && x.bp !== '' && Number.isFinite(Number(x.bp)))
+      .forEach(x => all.push({ d: len - Number(x.bp), fresh: seg.oil === 'fresh' }));
+  }));
+  const fresh = all.filter(v => v.fresh), use = fresh.length >= 8 ? fresh : all;
+  return { n: use.length, k: use.length >= 8 ? r1(median(use.map(v => v.d))) : null, freshOnly: use === fresh && fresh.length >= 8 };
 }
 
 export function oilLabel(len) {
@@ -288,6 +304,23 @@ export function insights(shots, lane, hand, session) {
     if (b - a >= 0.25) out.push({ level: 'info', title: 'זיהוי טרנזישן', seen: `כניסות גבוהות עלו מ-${pct(a * h, h)}% ל-${pct(b, 1)}% במהלך האימון.`, means: 'זה המסלול שמשתנה ולא אתה: הכדורים של כולם מנגבים את השמן בקו הנפוץ ומסיעים אותו קדימה.', todo: `צפה להזזות ${inW} כל משחק בערך. מי שזז ראשון מרוויח.`, why: 'בליגה עם שני מסלולים, גם השכנים שלך שוחקים את השמן. לכן הקריאה צריכה להיות מתמשכת.' });
   }
 
+  // 3.4 תבנית ידועה מול כלל ה-31: בדיקה אמיתית של ההערכה, ובניית הכלל האישי
+  const pat = session?.segs ? patternOf(session, curSegIdx(session)) : null;
+  const bpMed = median(nums(D, 'bp'));
+  if (pat?.len && bpMed !== null && nums(D, 'bp').length >= 3) {
+    const exp = pat.len - 31, d = r1(bpMed - exp), pr = personalRule31();
+    const outward = d < 0;
+    out.push({
+      level: 'info', title: 'התבנית האמיתית מול כלל ה-31',
+      seen: `התבנית${pat.name ? ` ${pat.name}` : ''}: ${pat.len} רגל${pat.vol ? `, ${pat.vol} מ"ל` : ''}. לפי כלל ה-31 השבירה צפויה בבורד ${exp}. אצלך היא בבורד ${r1(bpMed)} (${Math.abs(d) < 1.5 ? 'בדיוק לפי הכלל' : `${Math.abs(d)} בורדים ${outward ? outW : inW} מהצפוי`}).${pr.k !== null ? ` הכלל האישי שלך, מ-${pr.n} זריקות עם תבנית ידועה: אורך פחות ${pr.k}.` : ` עוד ${Math.max(0, 8 - pr.n)} זריקות עם תבנית ידועה, והאפליקציה תלמד את הכלל האישי שלך.`}`,
+      means: Math.abs(d) < 1.5 ? 'הכדור שלך מגיב לתבנית כמו שהכלל מנבא, ואפשר לסמוך על הערכת השימון גם באולמות שבהם התבנית לא ידועה.'
+        : outward ? `השבירה שלך רחוקה יותר החוצה מהצפוי. סיבות אפשריות: מהירות גבוהה יחסית לסיבוב, כדור שמחליק רחוק, או שימון כבד (${pat.vol ? 'בדוק את הנפח' : 'נפח גבוה'}) שגורם לתבנית "לשחק ארוך".`
+        : `השבירה שלך פנימה יותר מהצפוי. סיבות אפשריות: הרבה סיבוב ביחס למהירות, כדור חזק שמתעורר מוקדם, או שהתבנית כבר נשחקה ומשחקת קצר יותר מהאורך שלה.`,
+      todo: Math.abs(d) < 1.5 ? 'המשך לרשום את התבנית כשהיא ידועה. כל אימון כזה מחזק את הכלל.' : `באולם עם תבנית לא ידועה, חשב אורך = בורד השבירה + ${pr.k ?? r1(31 + (-d))} במקום 31. האפליקציה תעשה את זה לבד אחרי 8 זריקות עם תבנית ידועה.`,
+      why: 'כלל ה-31 הוא ממוצע. השחקן הספציפי (מהירות, סיבוב, כדור) מזיז אותו, ולכן הכלל האישי מדויק יותר.',
+    });
+  }
+
   // 3.5 מרחק מעמדת המוצא: כמה המסלול "הזיז" אותך
   const home = getDb().settings.home;
   if (home && st !== null && all.clean >= 4) {
@@ -431,6 +464,7 @@ const SRC = [
   ['שימון טרי', ['principle']], ['שימון משוחק', ['principle']], ['מסלול יבש', ['principle']],
   ['עבד לך בעבר', ['data']],
   ['שתי ידיים', ['estimate']],
+  ['כלל ה-31', ['principle', 'data'], 'כלל ה-31: BowlingLife, Human Kinetics'],
   ['ההמלצות שלך', ['data']],
 ];
 export const SRC_LABEL = { principle: '📚 עיקרון מקובל', estimate: '🧪 הערכה של האפליקציה', data: '📊 מהנתונים שלך' };

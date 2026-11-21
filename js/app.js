@@ -39,7 +39,9 @@ function renderHeader() {
   if (!s) { $('#sessionInfo').textContent = 'אין אימון פעיל'; return; }
   const seg = S.segOf(s, S.curSegIdx(s));
   const nums = seg.laneNums.L || seg.laneNums.R ? ` · מסלולים ${seg.laneNums.L || '?'} | ${seg.laneNums.R || '?'}` : '';
-  $('#sessionInfo').textContent = `${s.center}${nums} · ${S.OIL_LABEL[seg.oil]} · ${s.phase === 'warm' ? 'חימום' : `משחק ${s.games}`}`;
+  const pat = S.patternOf(s, S.curSegIdx(s));
+  const patTxt = pat ? ` · 🛢️ ${pat.name ? pat.name + ' ' : ''}${pat.len ? pat.len + ' רגל' : ''}` : '';
+  $('#sessionInfo').textContent = `${s.center}${nums} · ${S.OIL_LABEL[seg.oil]}${patTxt} · ${s.phase === 'warm' ? 'חימום' : `משחק ${s.games}`}`;
 }
 
 const laneName = (s, lane) => {
@@ -77,7 +79,7 @@ function renderStart(root) {
     <div class="seg" id="sStart"><button data-v="L">שמאל</button><button data-v="R">ימין</button></div>
     <label>החלפת מסלול בכל פריים</label>
     <div class="seg" id="sAlt"><button data-v="1">כן (מצב ליגה)</button><button data-v="0">לא, מסלול אחד</button></div>
-    <label>אורך תבנית, אם ידוע (רגל)</label><input type="number" id="sPat" inputmode="numeric" placeholder="לא ידוע">
+    ${patternFields(S.centerPattern(db.settings.center))}
     <label>הערה</label><input type="text" id="sNote" placeholder="למשל: אחרי ליגה, מזגן חזק...">
     <div style="height:12px"></div>
     <button class="btn pri big" id="sGo">יאללה, מתחילים</button>
@@ -102,7 +104,8 @@ function renderStart(root) {
   $('#sGo', root).onclick = () => {
     const center = $('#sCenter', root).value.trim() || db.settings.center;
     db.settings.center = center;
-    S.newSession({ center, type: f.type, laneL: $('#sL', root).value, laneR: $('#sR', root).value, oil: f.oil, startLane: f.startLane, alternate: f.alternate, liveTips: f.liveTips, warmup: f.warmup, patternLen: $('#sPat', root).value, note: $('#sNote', root).value });
+    S.newSession({ center, type: f.type, laneL: $('#sL', root).value, laneR: $('#sR', root).value, oil: f.oil, startLane: f.startLane, alternate: f.alternate, liveTips: f.liveTips, warmup: f.warmup, note: $('#sNote', root).value });
+    S.setPattern(S.currentSession(), readPattern(root));
     entryKey = '';
     renderPlay();
     toast(f.liveTips ? 'האימון התחיל. בלשונית <b>קריאה</b> מחכה לך עצה לפתיחה לפי מצב השימון 👀' : 'מצב רישום בלבד. בהצלחה! הקריאה תיפתח בסיום.');
@@ -110,6 +113,35 @@ function renderStart(root) {
 }
 
 // ---------- מעבר מסלולים ----------
+// ---------- תבנית שימון: שדות משותפים לפתיחת אימון ולעדכון באמצע ----------
+function patternFields(p) {
+  return `<label>תבנית השימון של האולם (אם ידוע)</label>
+    <p class="mute" style="margin:0 0 6px">מדף התבנית שהאולם מפרסם, או ממי שמשמן. האורך הוא הנתון החשוב.</p>
+    <div class="row">
+      <div class="grow" style="flex-basis:100%"><input type="text" id="pName" value="${esc(p?.name || '')}" placeholder="שם התבנית, למשל House Shot"></div>
+      <div class="grow"><input type="number" id="pLen" inputmode="numeric" value="${p?.len ?? ''}" placeholder="אורך (רגל)"></div>
+      <div class="grow"><input type="number" id="pVol" inputmode="decimal" step="0.1" value="${p?.vol ?? ''}" placeholder='נפח (מ"ל)'></div>
+    </div>`;
+}
+const readPattern = root => ({ name: $('#pName', root)?.value, len: $('#pLen', root)?.value, vol: $('#pVol', root)?.value });
+
+function renderPatternForm(root, s) {
+  const cur = S.patternOf(s, S.curSegIdx(s)) || S.centerPattern(s.center);
+  root.innerHTML = `<div class="card"><h2>🛢️ תבנית השימון</h2>
+    <p class="mute">אפשר להוסיף או לעדכן בכל רגע באימון. התבנית נשמרת לאולם הזה ותמולא מראש בפעם הבאה. כשהאורך ידוע, הקריאה משווה את כלל ה-31 לתבנית האמיתית ולומדת את הכלל האישי שלך.</p>
+    ${patternFields(cur)}
+    <div style="height:12px"></div>
+    <div class="row"><button class="btn pri grow" id="pSave">שמור</button><button class="btn" id="pClear">אין תבנית ידועה</button><button class="btn" id="pBack">ביטול</button></div></div>`;
+  $('#pSave', root).onclick = () => {
+    const p = S.cleanPattern(readPattern(root));
+    if (!p) { toast('צריך לפחות שם או אורך בין 25 ל-60 רגל'); return; }
+    S.setPattern(s, p); renderPlay();
+    toast(`נשמרה תבנית${p.name ? ` ${esc(p.name)}` : ''}${p.len ? `, ${p.len} רגל: לפי כלל ה-31 השבירה צפויה בסביבות בורד ${p.len - 31}` : ''}.`);
+  };
+  $('#pClear', root).onclick = () => { S.setPattern(s, null); renderPlay(); };
+  $('#pBack', root).onclick = () => renderPlay();
+}
+
 function renderSwitch(root, s) {
   let oil = 'used';
   root.innerHTML = `<div class="card"><h2>מעבר לזוג מסלולים אחר</h2>
@@ -258,6 +290,7 @@ export function renderPlay() {
         <button class="btn pri full big" id="saveShot"></button>
         <button class="btn sm" id="undo">↩︎ בטל אחרונה</button>
         <button class="btn sm" id="switchLanes">עברתי מסלולים</button>
+        <button class="btn sm full" id="patBtn">🛢️ ${S.patternOf(s, S.curSegIdx(s)) ? 'עדכן' : 'הוסף'} תבנית שימון של האולם</button>
       </div>
     </div>`;
   const draw = () => {
@@ -335,6 +368,7 @@ export function renderPlay() {
   $('#qChips')?.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; entry.quality = entry.quality === b.dataset.v ? null : b.dataset.v; renderPlay(); });
   $('#undo').onclick = () => { if (S.undoShot(s.id)) { entryKey = ''; renderPlay(); toast('הזריקה האחרונה בוטלה'); } };
   $('#switchLanes').onclick = () => renderSwitch(root, s);
+  $('#patBtn').onclick = () => renderPatternForm(root, s);
   $('#warmDone')?.addEventListener('click', () => renderWarmEnd(root, s));
   $('#saveShot').onclick = () => saveShot(s, ctx, game);
 }
