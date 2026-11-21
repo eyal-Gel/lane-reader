@@ -6,7 +6,7 @@ import { LEARN_HTML } from './learn.js';
 import { arrowNum, MOVE_INFO, geometry } from './geometry.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
-export const APP_VERSION = '1.3';
+export const APP_VERSION = '1.3.1';
 let readScope = 'seg';   // seg | session
 let unlocked = null;     // מזהה אימון שנפתח למרות מצב רישום בלבד
 
