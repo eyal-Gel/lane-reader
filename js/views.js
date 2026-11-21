@@ -7,7 +7,7 @@ import { arrowNum, MOVE_INFO, geometry } from './geometry.js';
 import { registerRecs, learnedSummary, KIND_LABEL } from './learnloop.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
-export const APP_VERSION = '1.6.1';
+export const APP_VERSION = '1.7';
 let readScope = 'seg';   // seg | session
 let unlocked = null;     // מזהה אימון שנפתח למרות מצב רישום בלבד
 
@@ -280,7 +280,7 @@ export function renderMore() {
     </div>
     <div class="card"><h2>גיבוי</h2><p class="mute">הנתונים שמורים רק בטלפון הזה. כדאי לייצא מדי פעם.</p>
       <div class="row"><button class="btn grow" id="exp">⬇️ ייצוא</button><label class="btn grow" style="margin:0;text-align:center;color:var(--text)">⬆️ ייבוא<input type="file" id="imp" accept=".json" hidden></label></div></div>
-    <p class="mute" style="text-align:center">גרסה ${APP_VERSION}</p>`;
+    <p class="mute" style="text-align:center">EGG קורא המסלולים · גרסה ${APP_VERSION}<br>© 2026 אייל גלברג (EGG · Eyal Gelberg Game). כל הזכויות שמורות.</p>`;
   // שחקנים
   $('#addProf', root).onclick = () => {
     const name = (prompt('שם השחקן החדש:', 'אורח') || '').trim();
@@ -317,7 +317,7 @@ export function renderMore() {
   root.querySelectorAll('[data-id] .del').forEach(b => b.onclick = () => { if (confirm('למחוק את האימון וכל הזריקות שלו? אי אפשר לשחזר.')) { S.deleteSession(b.closest('[data-id]').dataset.id); renderMore(); } });
   $('#xferMake', root).onclick = async () => {
     const url = `${location.origin}${location.pathname}#xfer=${S.makeTransfer()}`;
-    try { if (navigator.share) { await navigator.share({ title: 'קורא המסלול: הכדורים שלי', url }); return; } } catch (e) { if (e.name === 'AbortError') return; }
+    try { if (navigator.share) { await navigator.share({ title: 'EGG קורא המסלולים: הכדורים שלי', url }); return; } } catch (e) { if (e.name === 'AbortError') return; }
     try { await navigator.clipboard.writeText(url); toast('הקישור הועתק. הדבק אותו בוואטסאפ לעצמך ופתח בנייד.'); }
     catch { $('#xferIn', root).value = url; toast('הקישור מופיע בשדה. העתק אותו ידנית.'); }
   };

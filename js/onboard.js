@@ -17,7 +17,7 @@ export function renderOnboard(root, { onDone, onImport }) {
   const inW = () => f.hand === 'L' ? 'ימינה' : 'שמאלה';
   root.innerHTML = `
   <div class="card onboard">
-    <h2>👋 ברוך הבא לקורא המסלול</h2>
+    <h2>👋 ברוך הבא ל-EGG קורא המסלולים</h2>
     <p class="mute">כמה שאלות קצרות כדי שההמלצות יתאימו לך. אפשר לשנות הכול אחר כך בלשונית "עוד".</p>
 
     <label>איך קוראים לך?</label>

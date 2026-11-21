@@ -163,3 +163,4 @@ textarea { min-height: 64px; resize: vertical; }
 .src .tag.principle { color: var(--info); } .src .tag.estimate { color: var(--acc); } .src .tag.data { color: var(--good); }
 .src .ref { font-size: .72rem; color: var(--mute); }
 .ins p.track { color: var(--good); font-weight: 600; }
+.brand { font-family: 'Arial Black', Arial, sans-serif; letter-spacing: .04em; color: var(--acc); }

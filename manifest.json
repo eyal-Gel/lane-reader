@@ -1,7 +1,7 @@
 {
-  "name": "קורא המסלול",
-  "short_name": "קורא המסלול",
-  "description": "יומן זריקות ולימוד קריאת מסלול באולינג",
+  "name": "EGG קורא המסלולים",
+  "short_name": "EGG קורא",
+  "description": "EGG (Eyal Gelberg Game): יומן זריקות ולימוד קריאת מסלול באולינג",
   "lang": "he",
   "dir": "rtl",
   "start_url": "./",
