@@ -6,7 +6,7 @@ import { LEARN_HTML } from './learn.js';
 import { arrowNum, MOVE_INFO, geometry } from './geometry.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
-export const APP_VERSION = '1.0';
+export const APP_VERSION = '1.1';
 let readScope = 'seg';   // seg | session
 let unlocked = null;     // מזהה אימון שנפתח למרות מצב רישום בלבד
 
@@ -239,6 +239,11 @@ export function renderMore() {
         <div class="mute">${(s.segs || []).map(g => `${g.laneNums.L}|${g.laneNums.R} ${S.OIL_LABEL[g.oil]}`).join(' → ')} · משחקים: ${games.join(', ') || '—'}</div></div>
         <button class="btn sm view">קריאה</button><button class="btn sm danger del">🗑</button></div>`;
     }).join('') : '<p class="mute">עוד אין אימונים.</p>'}</div>
+    <div class="card"><h2>📲 העברה למכשיר אחר</h2>
+      <p class="mute">שולח את הכדורים וההגדרות (יד, עמדת מוצא, דריפט) בקישור. שלח אותו לעצמך בוואטסאפ ופתח בנייד. היסטוריית האימונים לא עוברת בקישור, בשבילה יש ייצוא וייבוא למטה.</p>
+      <button class="btn pri big" id="xferMake">שלח את הכדורים וההגדרות</button>
+      <div class="row" style="margin-top:10px"><input type="text" id="xferIn" class="grow" placeholder="או הדבק כאן קישור או קוד העברה"><button class="btn" id="xferGo">ייבא</button></div>
+    </div>
     <div class="card"><h2>גיבוי</h2><p class="mute">הנתונים שמורים רק בטלפון הזה. כדאי לייצא מדי פעם.</p>
       <div class="row"><button class="btn grow" id="exp">⬇️ ייצוא</button><label class="btn grow" style="margin:0;text-align:center;color:var(--text)">⬆️ ייבוא<input type="file" id="imp" accept=".json" hidden></label></div></div>
     <p class="mute" style="text-align:center">גרסה ${APP_VERSION}</p>`;
@@ -254,6 +259,13 @@ export function renderMore() {
   });
   root.querySelectorAll('[data-id] .view').forEach(b => b.onclick = () => { db.viewSessionId = b.closest('[data-id]').dataset.id; S.save(); go('read'); });
   root.querySelectorAll('[data-id] .del').forEach(b => b.onclick = () => { if (confirm('למחוק את האימון וכל הזריקות שלו? אי אפשר לשחזר.')) { S.deleteSession(b.closest('[data-id]').dataset.id); renderMore(); } });
+  $('#xferMake', root).onclick = async () => {
+    const url = `${location.origin}${location.pathname}#xfer=${S.makeTransfer()}`;
+    try { if (navigator.share) { await navigator.share({ title: 'קורא המסלול: הכדורים שלי', url }); return; } } catch (e) { if (e.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(url); toast('הקישור הועתק. הדבק אותו בוואטסאפ לעצמך ופתח בנייד.'); }
+    catch { $('#xferIn', root).value = url; toast('הקישור מופיע בשדה. העתק אותו ידנית.'); }
+  };
+  $('#xferGo', root).onclick = () => importTransfer($('#xferIn', root).value);
   $('#exp', root).onclick = () => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(db, null, 1)], { type: 'application/json' }));
@@ -264,6 +276,17 @@ export function renderMore() {
     try { if (!confirm('הייבוא יחליף את כל הנתונים הנוכחיים. להמשיך?')) return; S.replaceDb(JSON.parse(await f.text())); toast('הנתונים יובאו'); renderMore(); renderPlay(); }
     catch (err) { toast('שגיאה בייבוא: ' + esc(err.message)); }
   };
+}
+
+// ייבוא מקישור או מקוד, עם אישור
+export function importTransfer(code) {
+  let t;
+  try { t = S.readTransfer(code); } catch { toast('הקוד לא תקין. ודא שהעתקת את כל הקישור.'); return false; }
+  const names = t.balls.map(b => b.name).join(', ');
+  if (!confirm(`לייבא ${t.balls.length} כדורים (${names})${t.settings ? ' והגדרות' : ''}? כדור עם אותו שם יתעדכן, וכדור חדש יתווסף.`)) return false;
+  S.applyTransfer(t);
+  toast(`יובאו ${t.balls.length} כדורים${t.settings ? ' והגדרות' : ''} ✓`);
+  return true;
 }
 
 export function renderLearn() { $('#view-learn').innerHTML = LEARN_HTML; }

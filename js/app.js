@@ -2,7 +2,7 @@
 import * as S from './store.js';
 import { renderLane, renderDeck } from './lane.js';
 import { classifyLeave, insights, openingPlan } from './analysis.js';
-import { renderRead, renderBalls, renderMore, renderLearn } from './views.js';
+import { renderRead, renderBalls, renderMore, renderLearn, importTransfer } from './views.js';
 import { geometry, arrowNum, bodyCfg, releaseOf } from './geometry.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -411,4 +411,10 @@ function endSession() {
 
 // ---------- אתחול ----------
 renderPlay();
+// נפתח מקישור העברה: מייבאים (אחרי אישור) ומנקים את הקישור מהכתובת
+if (location.hash.startsWith('#xfer=')) {
+  const code = location.hash;
+  history.replaceState(null, '', location.pathname);
+  setTimeout(() => { if (importTransfer(code)) go('balls'); }, 300);
+}
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});

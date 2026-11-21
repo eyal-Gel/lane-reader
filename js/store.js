@@ -34,6 +34,33 @@ export function replaceDb(obj) {
   save();
 }
 
+// ---------- העברה למכשיר אחר (כדורים + הגדרות) ----------
+// הקוד נכנס אחרי # בקישור, ולכן לא נשלח לשום שרת
+const b64e = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const b64d = s => decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/'))));
+export function makeTransfer() {
+  return b64e(JSON.stringify({ v: 1, balls: db.balls, settings: db.settings }));
+}
+export function readTransfer(code) {
+  const raw = String(code || '').trim().replace(/^.*#xfer=/, '');
+  const o = JSON.parse(b64d(raw));
+  if (!o || o.v !== 1 || !Array.isArray(o.balls) || o.balls.length > 50) throw new Error('קוד לא תקין');
+  const balls = o.balls.filter(b => b && typeof b.name === 'string' && b.name.trim()).map(b => ({ ...b, name: String(b.name).slice(0, 60) }));
+  return { balls, settings: o.settings && typeof o.settings === 'object' ? o.settings : null };
+}
+// מיזוג: כדור עם אותו שם מתעדכן, כדור חדש נוסף. ההגדרות מתעדכנות
+export function applyTransfer(t) {
+  t.balls.forEach(b => {
+    const ex = db.balls.find(x => x.name.trim().toLowerCase() === b.name.trim().toLowerCase());
+    if (ex) Object.assign(ex, b, { id: ex.id }); else db.balls.push({ ...b, id: b.id || uid() });
+  });
+  if (t.settings) {
+    const keep = ['hand', 'style', 'center', 'speedUnit', 'home', 'drift', 'ballOff'];
+    keep.forEach(k => { if (t.settings[k] !== undefined) db.settings[k] = t.settings[k]; });
+  }
+  save();
+}
+
 // ---------- כדורים ----------
 export function upsertBall(ball) {
   const i = db.balls.findIndex(b => b.id === ball.id);
