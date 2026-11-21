@@ -116,7 +116,7 @@ function renderStart(root) {
 // ---------- תבנית שימון: שדות משותפים לפתיחת אימון ולעדכון באמצע ----------
 function patternFields(p) {
   return `<label>תבנית השימון של האולם (אם ידוע)</label>
-    <p class="mute" style="margin:0 0 6px">מדף התבנית שהאולם מפרסם, או ממי שמשמן. האורך הוא הנתון החשוב.</p>
+    <p class="mute" style="margin:0 0 6px">מדף התבנית שהאולם מפרסם, או ממי שמשמן. האורך הוא הנתון החשוב. אם מולא מהפעם הקודמת, בדוק שזו התבנית של היום.</p>
     <div class="row">
       <div class="grow" style="flex-basis:100%"><input type="text" id="pName" value="${esc(p?.name || '')}" placeholder="שם התבנית, למשל House Shot"></div>
       <div class="grow"><input type="number" id="pLen" inputmode="numeric" value="${p?.len ?? ''}" placeholder="אורך (רגל)"></div>
@@ -126,19 +126,42 @@ function patternFields(p) {
 const readPattern = root => ({ name: $('#pName', root)?.value, len: $('#pLen', root)?.value, vol: $('#pVol', root)?.value });
 
 function renderPatternForm(root, s) {
+  const seg = S.segOf(s, S.curSegIdx(s));
   const cur = S.patternOf(s, S.curSegIdx(s)) || S.centerPattern(s.center);
-  root.innerHTML = `<div class="card"><h2>🛢️ תבנית השימון</h2>
-    <p class="mute">אפשר להוסיף או לעדכן בכל רגע באימון. התבנית נשמרת לאולם הזה ותמולא מראש בפעם הבאה. כשהאורך ידוע, הקריאה משווה את כלל ה-31 לתבנית האמיתית ולומדת את הכלל האישי שלך.</p>
+  let oil = seg.oil, mode = 'fix';
+  root.innerHTML = `<div class="card"><h2>🛢️ עדכון שימון</h2>
+    <p class="mute">אפשר לעדכן בכל רגע: אם רשמת מצב לא נכון, אם המסלול משומן מחדש, או אם התבנית שונה ממה שחשבת.</p>
+    <label>מה קרה?</label>
+    <div class="seg" id="cMode"><button data-v="fix" class="on">תיקון: כך זה היה מההתחלה</button><button data-v="now">השימון השתנה עכשיו</button></div>
+    <p class="mute" id="cModeTxt" style="margin:4px 0 0"></p>
+    <label>מצב השימון</label>
+    <div class="seg" id="cOil"><button data-v="fresh">🛢️ טרי</button><button data-v="used">〰️ משוחק</button><button data-v="dry">🏜️ יבש</button></div>
     ${patternFields(cur)}
     <div style="height:12px"></div>
     <div class="row"><button class="btn pri grow" id="pSave">שמור</button><button class="btn" id="pClear">אין תבנית ידועה</button><button class="btn" id="pBack">ביטול</button></div></div>`;
-  $('#pSave', root).onclick = () => {
-    const p = S.cleanPattern(readPattern(root));
-    if (!p) { toast('צריך לפחות שם או אורך בין 25 ל-60 רגל'); return; }
-    S.setPattern(s, p); renderPlay();
-    toast(`נשמרה תבנית${p.name ? ` ${esc(p.name)}` : ''}${p.len ? `, ${p.len} רגל: לפי כלל ה-31 השבירה צפויה בסביבות בורד ${p.len - 31}` : ''}.`);
+  const sync = () => {
+    root.querySelectorAll('#cOil button').forEach(b => b.classList.toggle('on', b.dataset.v === oil));
+    root.querySelectorAll('#cMode button').forEach(b => b.classList.toggle('on', b.dataset.v === mode));
+    $('#cModeTxt', root).textContent = mode === 'fix'
+      ? 'הזריקות שכבר נרשמו יקבלו את המצב המתוקן, והקריאה תמשיך כרגיל.'
+      : 'הקריאה מתחילה מחדש מהזריקה הבאה (באותם מסלולים ובאותו משחק), כי הזריקות הקודמות היו בתנאים אחרים.';
   };
-  $('#pClear', root).onclick = () => { S.setPattern(s, null); renderPlay(); };
+  $('#cOil', root).onclick = e => { const b = e.target.closest('button'); if (b) { oil = b.dataset.v; sync(); } };
+  $('#cMode', root).onclick = e => { const b = e.target.closest('button'); if (b) { mode = b.dataset.v; sync(); } };
+  sync();
+  const apply = p => {
+    if (mode === 'now') { S.newSegment(s, seg.laneNums.L, seg.laneNums.R, oil, true); entryKey = ''; }
+    else S.setSegOil(s, oil);
+    S.setPattern(s, p);
+    renderPlay();
+  };
+  $('#pSave', root).onclick = () => {
+    const raw = readPattern(root), p = S.cleanPattern(raw);
+    if (!p && (raw.name?.trim() || raw.len)) { toast('האורך צריך להיות בין 25 ל-60 רגל'); return; }
+    apply(p);
+    toast(`${mode === 'now' ? 'נפתחה קריאה חדשה' : 'עודכן'}: ${S.OIL_LABEL[oil]}${p ? ` · ${p.name ? esc(p.name) + ' ' : ''}${p.len ? `${p.len} רגל (שבירה צפויה בסביבות בורד ${p.len - 31})` : ''}` : ''}.`, 6000);
+  };
+  $('#pClear', root).onclick = () => apply(null);
   $('#pBack', root).onclick = () => renderPlay();
 }
 
@@ -290,7 +313,7 @@ export function renderPlay() {
         <button class="btn pri full big" id="saveShot"></button>
         <button class="btn sm" id="undo">↩︎ בטל אחרונה</button>
         <button class="btn sm" id="switchLanes">עברתי מסלולים</button>
-        <button class="btn sm full" id="patBtn">🛢️ ${S.patternOf(s, S.curSegIdx(s)) ? 'עדכן' : 'הוסף'} תבנית שימון של האולם</button>
+        <button class="btn sm full" id="patBtn">🛢️ עדכון שימון: מצב ותבנית</button>
       </div>
     </div>`;
   const draw = () => {

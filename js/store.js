@@ -187,15 +187,18 @@ export function setPattern(s, p) {
   if (seg.pattern) (db.settings.centerPatterns ||= {})[s.center] = seg.pattern;
   save();
 }
+// תיקון מצב השימון של הקטע הנוכחי (למשל: רשמתי טרי, אבל התברר שכבר שיחקו עליו)
+export function setSegOil(s, oil) { const seg = segOf(s, curSegIdx(s)); if (seg && OIL_LABEL[oil]) { seg.oil = oil; save(); } }
 export const centerPattern = center => db.settings.centerPatterns?.[center] || null;
 
 export const OIL_LABEL = { fresh: 'שימון טרי', used: 'משוחק חלקית', dry: 'יבש יחסית' };
 
 // מעבר לזוג מסלולים אחר באמצע אימון: מתחיל משחק חדש בקטע חדש
-export function newSegment(session, laneL, laneR, oil) {
+// keepGame: שינוי שימון באמצע משחק (משומן מחדש) לא מתחיל משחק חדש, רק קריאה חדשה
+export function newSegment(session, laneL, laneR, oil, keepGame = false) {
   session.segs ||= [{ laneNums: session.laneNums, oil: 'fresh', startGame: 0 }];
   const hasShots = gameShots(session.id, session.games - 1).length > 0;
-  if (hasShots) session.games++;
+  if (hasShots && !keepGame) session.games++;
   // אותו אולם = בדרך כלל אותה תבנית, אז היא עוברת לקטע החדש
   const prevPat = session.segs[session.segs.length - 1]?.pattern || null;
   session.segs.push({ laneNums: { L: laneL, R: laneR }, oil, startGame: session.games - 1, pattern: prevPat });
