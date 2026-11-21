@@ -154,3 +154,7 @@ textarea { min-height: 64px; resize: vertical; }
 .ptag { font-size: .8rem; font-weight: 600; color: var(--acc); margin-inline-start: 6px; }
 .prof { padding: 8px 0; border-bottom: 1px solid var(--line); }
 .prof.cur b { color: var(--acc); }
+.onboard .num { min-width: 40px; text-align: center; font-size: 1.3rem; color: var(--acc); }
+.onboard .seg button small { color: inherit; opacity: .75; font-size: .72rem; }
+.onboard details summary { cursor: pointer; margin-top: 6px; }
+.onboard .stp { direction: ltr; justify-content: flex-end; }

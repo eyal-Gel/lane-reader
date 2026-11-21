@@ -4,6 +4,7 @@ import { renderLane, renderDeck } from './lane.js';
 import { classifyLeave, insights, openingPlan } from './analysis.js';
 import { renderRead, renderBalls, renderMore, renderLearn, importTransfer } from './views.js';
 import { geometry, arrowNum, bodyCfg, releaseOf } from './geometry.js';
+import { renderOnboard } from './onboard.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -53,7 +54,7 @@ function renderStart(root) {
   <div class="card">
     <h2>אימון חדש</h2>
     ${db.balls.length ? '' : `<p class="mute">💡 עוד לא הוספת כדורים. כדאי להוסיף אותם בלשונית "ארסנל" כדי לקבל המלצות על החלפת כדור.</p>`}
-    <label>אולם</label><input type="text" id="sCenter" value="${esc(db.settings.center)}">
+    <label>אולם</label><input type="text" id="sCenter" value="${esc(db.settings.center)}" placeholder="שם האולם">
     <label>סוג</label>
     <div class="seg" id="sType"><button data-v="training">אימון</button><button data-v="league">ליגה</button><button data-v="tournament">תחרות</button></div>
     <label>חימום לפני המשחק</label>
@@ -186,6 +187,13 @@ function setStance(b) {
 export function renderPlay() {
   renderHeader();
   const root = $('#view-play');
+  // שחקן חדש (מכשיר חדש או פרופיל חדש): קודם מסך פתיחה
+  if (!S.getDb().settings.onboarded) {
+    return renderOnboard(root, {
+      onImport: code => importTransfer(code),
+      onDone: fresh => { renderPlay(); renderHeader(); if (fresh) toast('מוכן! עכשיו הוסף את הכדורים שלך בלשונית <b>ארסנל</b>, ואחר כך פתח אימון כאן.', 6000); },
+    });
+  }
   const s = S.currentSession();
   if (!s) return renderStart(root);
   const warm = s.phase === 'warm';

@@ -39,7 +39,8 @@ export function resetCurrentProfile() { try { localStorage.removeItem(KEY); } ca
 export const ALL_PINS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 const defaults = () => ({
-  settings: { hand: 'R', style: 'one', center: 'בולה באולינג חולון', speedUnit: 'kmh', home: { board: 18, cm: 0, arrow: 10 }, drift: 2, ballOff: 5 },
+  // ברירות מחדל כלליות. מסך הפתיחה (onboarded=false) מבקש מכל שחקן חדש את הנתונים שלו
+  settings: { hand: 'R', style: 'one', center: '', speedUnit: 'kmh', home: { board: 18, cm: 0, arrow: 10 }, drift: 2, ballOff: 5, onboarded: false },
   balls: [],
   sessions: [],
   shots: [],
@@ -53,7 +54,9 @@ function load() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return defaults();
     const d = defaults(), o = JSON.parse(raw);
-    return Object.assign(d, o, { settings: Object.assign(d.settings, o.settings) });
+    // מי שכבר השתמש באפליקציה לפני מסך הפתיחה לא יראה אותו
+    const settings = Object.assign(d.settings, { onboarded: true }, o.settings);
+    return Object.assign(d, o, { settings });
   } catch { return defaults(); }
 }
 
@@ -93,6 +96,7 @@ export function applyTransfer(t) {
   if (t.settings) {
     const keep = ['hand', 'style', 'center', 'speedUnit', 'home', 'drift', 'ballOff'];
     keep.forEach(k => { if (t.settings[k] !== undefined) db.settings[k] = t.settings[k]; });
+    db.settings.onboarded = true;   // הגיע עם הגדרות מוכנות, אין צורך במסך פתיחה
   }
   save();
 }
@@ -139,7 +143,7 @@ export function ballStrength(b) {
 export function newSession(opts) {
   const s = {
     id: uid(), date: new Date().toISOString(),
-    center: opts.center || db.settings.center,
+    center: opts.center || db.settings.center || 'אולם באולינג',
     type: opts.type || 'training',
     laneNums: { L: opts.laneL || '', R: opts.laneR || '' },
     startLane: opts.startLane || 'L',
