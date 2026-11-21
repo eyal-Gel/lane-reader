@@ -45,6 +45,7 @@ const defaults = () => ({
   sessions: [],
   shots: [],
   currentSessionId: null,
+  recs: [],   // לולאת למידה: המלצות הזזה, האם בוצעו ומה קרה אחריהן
 });
 
 let db = load();
@@ -109,6 +110,12 @@ export function upsertBall(ball) {
 }
 export function removeBall(id) { db.balls = db.balls.filter(b => b.id !== id); save(); }
 export const ballById = id => db.balls.find(b => b.id === id);
+
+// כמה פעמים הזזה מסוג מסוים עבדה אצלך במצב מסוים (מתוך המלצות שבוצעו ונבדקו)
+export function recStats(kind, type) {
+  const done = (db.recs || []).filter(r => r.kind === kind && r.type === type && ['better', 'same', 'worse'].includes(r.status));
+  return { n: done.length, ok: done.filter(r => r.status === 'better').length };
+}
 
 // שיוף: רושם את התאריך והגריט החדש. המשטח הנוכחי (grit) הוא מה שנכנס לחישוב העוצמה
 export function resurface(id, grit, date = new Date().toISOString()) {

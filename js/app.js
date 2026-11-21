@@ -5,6 +5,7 @@ import { classifyLeave, insights, openingPlan } from './analysis.js';
 import { renderRead, renderBalls, renderMore, renderLearn, importTransfer } from './views.js';
 import { geometry, arrowNum, bodyCfg, releaseOf } from './geometry.js';
 import { renderOnboard } from './onboard.js';
+import { registerRecs, updateRecs, eventText } from './learnloop.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -371,6 +372,9 @@ function saveShot(s, ctx, game) {
     ballGrit: S.ballById(entry.ball)?.grit || null,   // צילום מצב המשטח בזמן הזריקה
   };
   S.addShot(shot);
+  // לולאת למידה: האם ביצעת המלצה? האם אפשר כבר לבדוק אם היא עזרה?
+  const evs = updateRecs(s);
+  const evHtml = evs.map(e => `<div style="margin-top:6px">${esc(eventText(e))}</div>`).join('');
   if (s.liveTips === false && !ctx.warm) { toast('נרשם ✓', 1200); entryKey = ''; renderPlay(); return; }
   if (ctx.rack.length === 10 && shot.exec !== 'ok') {
     const side = entry.miss === 'left' ? 'שמאלה' : 'ימינה';
@@ -381,10 +385,12 @@ function saveShot(s, ctx, game) {
     const cat = classifyLeave(shot, hand);
     let msg = QUICK[cat];
     const segShots = S.sessionShots(s.id).filter(x => (x.seg ?? 0) === shot.seg);
-    const warn = insights(segShots, shot.lane, hand, s).find(i => i.level === 'warn');
+    const ins = insights(segShots, shot.lane, hand, s);
+    registerRecs(s, shot.lane, ins);
+    const warn = ins.find(i => i.level === 'warn');
     if (warn) msg += `<br><b style="color:var(--warn)">⚠️ ${esc(warn.title)}</b>: פרטים בלשונית קריאה`;
-    toast(msg);
-  }
+    toast(msg + evHtml, evHtml ? 8000 : 4200);
+  } else if (evHtml) toast(evHtml, 7000);
   entryKey = '';
   renderPlay();
 }

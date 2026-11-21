@@ -162,3 +162,4 @@ textarea { min-height: 64px; resize: vertical; }
 .src .tag { font-size: .72rem; border-radius: 999px; padding: 2px 8px; background: var(--card2); }
 .src .tag.principle { color: var(--info); } .src .tag.estimate { color: var(--acc); } .src .tag.data { color: var(--good); }
 .src .ref { font-size: .72rem; color: var(--mute); }
+.ins p.track { color: var(--good); font-weight: 600; }

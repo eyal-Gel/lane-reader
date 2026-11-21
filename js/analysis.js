@@ -1,5 +1,5 @@
 // מנוע קריאת מסלול: סטטיסטיקה + תובנות מלמדות (מה ראינו / מה זה אומר / מה לעשות / למה)
-import { getDb, ballById, ballStrength, isSplit, lastSanded, gamesSinceSand } from './store.js';
+import { getDb, ballById, ballStrength, isSplit, lastSanded, gamesSinceSand, recStats } from './store.js';
 import { calibrate, moveOptions, chooseMove, lineRead, arrowLabel, MOVE_INFO, bodyCfg, finishOf } from './geometry.js';
 
 const MIRROR = { 1: 1, 2: 3, 3: 2, 4: 6, 5: 5, 6: 4, 7: 10, 8: 9, 9: 8, 10: 7 };
@@ -142,11 +142,22 @@ export function insights(shots, lane, hand, session) {
     out.push({ level: 'info', title: 'צריך עוד כמה זריקות', seen: `נרשמו ${all.n} זריקות ראשונות במסלול הזה.`, means: 'עם פחות מ-3 זריקות כל מסקנה היא ניחוש.', todo: 'המשך לרשום. אחרי 4-5 זריקות מתחילים לראות כיוון.', why: 'קריאת מסלול היא חיפוש דפוס, וזריקה אחת לא יוצרת דפוס.' });
     return out;
   }
-  const n = R.length;
-  const c = k => R.filter(s => classifyLeave(s, hand) === k).length;
+  // הקו הנוכחי: הזריקות האחרונות ברצף על אותה עמידה ואותו חץ (±1). אחרי הזזה מאבחנים רק את הקו החדש,
+  // כדי שכניסות גבוהות מהקו הישן לא ימשיכו "לצעוק" אחרי שכבר תיקנת
+  const lastS = R[R.length - 1];
+  const sameLine = x => lastS && Math.abs((x.stance?.board ?? 0) - (lastS.stance?.board ?? 0)) <= 1 && Math.abs((x.arrow ?? 0) - (lastS.arrow ?? 0)) <= 1;
+  const run = [];
+  for (let i = R.length - 1; i >= 0 && sameLine(R[i]); i--) run.unshift(R[i]);
+  const onNewLine = run.length < R.length;
+  const waitNewLine = onNewLine && run.length < 3;
+  const D = onNewLine && !waitNewLine ? run : R;
+  const n = D.length;
+  const c = k => D.filter(s => classifyLeave(s, hand) === k).length;
   const strikes = c('strike'), high = c('high'), light = c('light'), weak10 = c('weak10'), strong10 = c('strong10');
   const lastBall = R[R.length - 1]?.ball;
-  const st = recent.stance, cm = recent.cm;
+  const st = onNewLine ? median(run.map(x => x.stance?.board).filter(Number.isFinite)) : recent.stance;
+  const cm = onNewLine ? median(run.map(x => x.stance?.cm).filter(Number.isFinite)) ?? recent.cm : recent.cm;
+  if (waitNewLine) out.push({ level: 'info', title: 'קו חדש: נותנים לו כמה זריקות', seen: `עברת לעמידה ${lastS.stance?.board ?? '?'} ו${arrowLabel(lastS.arrow)} (${run.length} ${run.length === 1 ? 'זריקה' : 'זריקות'} עד עכשיו).`, means: 'הזריקות מהקו הקודם כבר לא מספרות על הקו הזה.', todo: 'זרוק לפחות 3 זריקות בקו החדש לפני שמחליטים אם הוא עובד.', why: 'הזזה אחת נשפטת על פי כמה זריקות, לא על פי הראשונה.' });
   const inW = sideWord(hand, true), outW = sideWord(hand, false);
 
   // 0. דיוק ביצוע ומרחב טעות
@@ -180,32 +191,41 @@ export function insights(shots, lane, hand, session) {
   }
 
   // 2. אבחון כניסה לכיס
-  if (strikes / n >= 0.5 && high / n < 0.3 && light / n < 0.3) {
+  if (!waitNewLine && strikes / n >= 0.5 && high / n < 0.3 && light / n < 0.3) {
     out.push({ level: 'good', title: 'אתה בקו, אל תיגע', seen: `${strikes} סטרייקים מתוך ${n} זריקות אחרונות.`, means: 'הכדור, הקו והמסלול מסונכרנים כרגע.', todo: 'שמור עמידה, חץ ומהירות. שים לב לסימן הראשון של כניסה גבוהה (4 / 7-10): זה הרמז שהמסלול מתחיל להתייבש.', why: 'שחקנים רבים מאבדים קו טוב כי הם "מתקנים" משהו שעובד.' });
   }
   // הזזות: בחירת סוג (רק עמידה / 2:1 / 2:2) + טבלת השוואה עם שבירה צפויה
-  const arrowNow = recent.arrow !== null ? Math.round(recent.arrow) : null;
+  const arrowNow = onNewLine ? (lastS?.arrow ?? null) : (recent.arrow !== null ? Math.round(recent.arrow) : null);
   const stR = st !== null ? Math.round(st) : null;
   const cfg = bodyCfg(getDb().settings);
   const cal = calibrate(all.first, cfg);
   const driftNow = recent.drift ?? cfg.drift;
   const heavyOf = arr => arr.filter(s => isSplit(s.left) || s.quality === 'brooklyn' || s.left.length >= 3 || classifyLeave(s, hand) === 'head').length;
   const moveBlock = (kind, probs) => {
-    const ch = chooseMove(kind, heavyOf(probs) >= Math.max(1, probs.length / 3));
+    let ch = chooseMove(kind, heavyOf(probs) >= Math.max(1, probs.length / 3));
+    // הניסיון שלך גובר על הכלל: אם ההזזה המומלצת לא עבדה לך, ואחרת כן, עוברים לזו שעבדה
+    const mine = recStats(kind, ch.type);
+    if (mine.n >= 2 && mine.ok / mine.n < 0.34) {
+      const better = ['feet', '21', '22'].filter(t => t !== ch.type).map(t => ({ t, ...recStats(kind, t) }))
+        .filter(x => x.n >= 2 && x.ok / x.n >= 0.5).sort((a, b) => b.ok / b.n - a.ok / a.n)[0];
+      if (better) ch = { ...ch, type: better.t, reason: `אצלך ${MOVE_INFO[ch.type].name} במצב הזה עבדה רק ${mine.ok} מתוך ${mine.n} פעמים, ו-${MOVE_INFO[better.t].name} עבדה ${better.ok} מתוך ${better.n}. לכן הפעם ההמלצה מבוססת על הניסיון שלך ולא על הכלל הכללי.` };
+    }
+    const fin = recStats(kind, ch.type);
+    const track = fin.n ? `אצלך בעבר: ${MOVE_INFO[ch.type].name} במצב הזה עבדה ${fin.ok} מתוך ${fin.n} פעמים.` : '';
     const w = ch.dir > 0 ? inW : outW;
     const opts = moveOptions(stR, arrowNow, driftNow, ch.dir, cal.offset, cfg);
     const rec = opts.find(o => o.type === ch.type);
     const text = rec
       ? `הזזה ${MOVE_INFO[ch.type].name} ${w}: עמידה מבורד ${stR} ל-${rec.stance}, ${arrowLabel(arrowNow)} ← ${arrowLabel(rec.arrow)}. זווית ${stR - arrowNow} ← ${rec.launch} בורדים, שבירה צפויה בבורד ${rec.bp}.`
       : `הזזה ${MOVE_INFO[ch.type].name} ${w} (רשום עמידה וחץ כדי לקבל מספרים מדויקים).`;
-    return { ch, opts, text };
+    return { ch, opts, text, track, from: { stance: stR, arrow: arrowNow }, to: rec ? { stance: rec.stance, arrow: rec.arrow } : null };
   };
   const stepTwo = dirIn => dirIn
     ? (cm > 0 ? ` אם זה לא מספיק: עמוד 15-30 ס"מ אחורה (מ-${cm} ל-${Math.max(0, cm - 20)} ס"מ, ${cm - 20 <= 0 ? 'הכי אחורה' : 'קרוב לאמצע'}) או הוסף קצת מהירות.` : ' אם זה לא מספיק: אתה כבר הכי אחורה בגישה, אז הוסף קצת מהירות.')
     : ` אם זה לא מספיק: עמוד 15-20 ס"מ קדימה${cm !== null ? ` (ל-${cm + 20} ס"מ${cm + 20 === 20 ? ', באמצע' : ''})` : ''} או האט קצת.`;
 
-  const highShots = R.filter(s => classifyLeave(s, hand) === 'high');
-  if (high / n >= 0.35) {
+  const highShots = D.filter(s => classifyLeave(s, hand) === 'high');
+  if (!waitNewLine && high / n >= 0.35) {
     const alt = pickBall(lastBall, false);
     const m = moveBlock('high', highShots);
     out.push({
@@ -214,27 +234,27 @@ export function insights(shots, lane, hand, session) {
       means: 'השמן בקו שלך התייבש (טרנזישן) או שהכדור חזק מדי לתנאים. הכדור מתחיל לפנות לפני הזמן ונכנס עמוק מדי לכיס.',
       todo: m.text + stepTwo(true) + (alt ? ` ואם גם זה לא: ${alt.name}.` : ''),
       why: m.ch.reason + (two ? ' כשחקן שתי ידיים עם סיבוב גבוה, הכדור מגיב חזק לכל שינוי בשמן, ולכן לפעמים צריך הזזות גדולות יותר (3-4 בורדים ברגליים).' : '') + (alt ? ' ' + ballWhy(alt, false) + '.' : ''),
-      moves: m.opts, rec: m.ch.type,
+      moves: m.opts, rec: m.ch.type, kind: 'high', from: m.from, to: m.to, track: m.track,
     });
   }
-  if ((light + weak10) / n >= 0.35) {
+  if (!waitNewLine && (light + weak10) / n >= 0.35) {
     const alt = pickBall(lastBall, true);
     const w10 = weak10 >= light;
-    const m = moveBlock(w10 ? 'weak10' : 'light', R.filter(s => ['light', 'weak10', 'head'].includes(classifyLeave(s, hand))));
+    const m = moveBlock(w10 ? 'weak10' : 'light', D.filter(s => ['light', 'weak10', 'head'].includes(classifyLeave(s, hand))));
     out.push({
       level: 'warn', title: w10 ? '10 חלש: הכדור מגיע בלי מספיק זווית' : 'הכדור לא פונה מספיק (כניסה חלשה)',
       seen: w10 ? `${weak10} פעמים נשאר 10 (או 6-10) מתוך ${n}.` : `${light} זריקות השאירו פינים של כניסה חלשה (2, 5, 8, 2-8, 2-4-5).`,
       means: w10 ? 'הכדור הגיע לכיס אבל "התעייף": נכנס ישר מדי בלי זווית, או פנה מוקדם ואיבד אנרגיה.' : 'יש יותר שמן בקו שלך ממה שהכדור יודע לחתוך. הוא מחליק עד מאוחר ולא נכנס מספיק לכיס.',
       todo: (wornNote(lastBall) ? wornNote(lastBall) + ' ' : '') + m.text + (w10 ? '' : stepTwo(false)) + (alt ? ` אם זה חוזר: ${alt.name}.` : ''),
       why: m.ch.reason + (alt ? ' ' + ballWhy(alt, true) + '.' : ''),
-      moves: m.opts, rec: m.ch.type,
+      moves: m.opts, rec: m.ch.type, kind: w10 ? 'weak10' : 'light', from: m.from, to: m.to, track: m.track,
     });
   }
 
   // 10 חזק: לרוב זריקה טובה. מגיבים רק כשזה חוזר
-  if (strong10 >= 3 && strong10 / n >= 0.3) {
-    const m = moveBlock('strong10', R.filter(s => classifyLeave(s, hand) === 'strong10'));
-    const sp10 = nums(R.filter(s => classifyLeave(s, hand) === 'strong10'), 'speed'), spAll = nums(R, 'speed');
+  if (!waitNewLine && strong10 >= 3 && strong10 / n >= 0.3) {
+    const m = moveBlock('strong10', D.filter(s => classifyLeave(s, hand) === 'strong10'));
+    const sp10 = nums(D.filter(s => classifyLeave(s, hand) === 'strong10'), 'speed'), spAll = nums(D, 'speed');
     const fast = sp10.length >= 2 && spAll.length >= 4 && median(sp10) > median(spAll) + 0.5;
     const altW = pickBall(lastBall, false);
     out.push({
@@ -244,7 +264,7 @@ export function insights(shots, lane, hand, session) {
       todo: (fast ? 'קודם כול האט מעט: אצלך ה-10 החזק מגיע דווקא בזריקות המהירות. ' : '') +
         `כדי לסגור קצת את הזווית: ${m.text}` + (altW ? ` או כדור חלק יותר: ${altW.name}.` : ''),
       why: m.ch.reason + ' לפי מקורות ההדרכה, ל-10 חזק ול-10 חלש יש סיבות שונות ותיקונים שונים, ולכן חשוב לסמן נכון איזה מהם היה.',
-      moves: m.opts, rec: m.ch.type,
+      moves: m.opts, rec: m.ch.type, kind: 'strong10', from: m.from, to: m.to, track: m.track,
     });
   }
 
@@ -411,6 +431,7 @@ const SRC = [
   ['שימון טרי', ['principle']], ['שימון משוחק', ['principle']], ['מסלול יבש', ['principle']],
   ['עבד לך בעבר', ['data']],
   ['שתי ידיים', ['estimate']],
+  ['ההמלצות שלך', ['data']],
 ];
 export const SRC_LABEL = { principle: '📚 עיקרון מקובל', estimate: '🧪 הערכה של האפליקציה', data: '📊 מהנתונים שלך' };
 export function sourceOf(title) {

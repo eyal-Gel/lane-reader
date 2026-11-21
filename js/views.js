@@ -4,15 +4,16 @@ import { laneStats, oilEstimate, oilLabel, insights, compareLanes, startAdvice, 
 import { esc, go, toast, renderPlay } from './app.js';
 import { LEARN_HTML } from './learn.js';
 import { arrowNum, MOVE_INFO, geometry } from './geometry.js';
+import { registerRecs, learnedSummary, KIND_LABEL } from './learnloop.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
-export const APP_VERSION = '1.4';
+export const APP_VERSION = '1.5';
 let readScope = 'seg';   // seg | session
 let unlocked = null;     // מזהה אימון שנפתח למרות מצב רישום בלבד
 
 const insHtml = i => `<div class="ins ${i.level}"><h4>${esc(i.title)}</h4>
   <p><b>מה ראינו:</b> ${esc(i.seen)}</p><p><b>מה זה אומר:</b> ${esc(i.means)}</p>
-  <p><b>מה לעשות:</b> ${esc(i.todo)}</p>${i.moves?.length ? movesTable(i.moves, i.rec) : ''}<p><b>למה:</b> ${esc(i.why)}</p>${srcLine(i.title)}</div>`;
+  <p><b>מה לעשות:</b> ${esc(i.todo)}</p>${i.moves?.length ? movesTable(i.moves, i.rec) : ''}${i.track ? `<p class="track">📊 ${esc(i.track)}</p>` : ''}<p><b>למה:</b> ${esc(i.why)}</p>${srcLine(i.title)}</div>`;
 
 // מקור ורמת ביטחון: כדי שתדע על מה לסמוך
 const srcLine = title => { const s = sourceOf(title); return `<div class="src">${s.kinds.map(k => `<span class="tag ${k}">${SRC_LABEL[k]}</span>`).join('')}${s.ref ? `<span class="ref">${esc(s.ref)}</span>` : ''}</div>`; };
@@ -78,10 +79,10 @@ export function renderRead() {
       ${bpChart(st.first)}
       ${leaveBars(st)}
       <h3 style="margin-top:12px">קריאה</h3>
-      ${insights(shots, lane, hand, s).map(insHtml).join('')}
+      ${laneIns(s, live, shots, lane, hand).map(insHtml).join('')}
     </div>`;
   });
-  html += ballTable(shots, hand);
+  html += ballTable(shots, hand) + learnedCard();
   root.innerHTML = html;
   $('#scope', root)?.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; readScope = b.dataset.v; renderRead(); });
 }
@@ -93,6 +94,27 @@ function geoLine(st) {
   const r = x => Math.round(x * 10) / 10;
   return `<div class="geo"><span>עמידה <b>${st.stance}</b></span><i>${r(g.launch)}</i><span>חץ <b>${st.arrow}</b></span><i>${r(g.swing)}</i><span>שבירה <b>${st.bp}</b></span><i>${g.hook}</i><span>כיס <b>17.5</b></span></div>
     <div class="mute" style="font-size:.78rem">המספרים בין התחנות: כמה בורדים הכדור עובר בכל קטע. עמידה ← חץ = זווית היציאה.</div>`;
+}
+
+// תובנות למסלול + רישום ההמלצות לטובת לולאת הלמידה (רק באימון פעיל, ורק אם ההמלצות מוצגות)
+function laneIns(s, live, shots, lane, hand) {
+  const ins = insights(shots, lane, hand, s);
+  if (live) registerRecs(s, lane, ins);
+  return ins;
+}
+
+// מה למדנו מההמלצות שביצעת
+function learnedCard() {
+  const L = learnedSummary();
+  if (!L.rows.length && !L.pending && !L.open) return '';
+  return `<div class="card"><h2>🧠 מה למדנו מההמלצות שלך</h2>
+    <p class="mute">כשאתה מבצע הזזה שהומלצה, האפליקציה מזהה את זה ובודקת את ${4} הזריקות הבאות. ככה ההמלצות לומדות מה עובד דווקא אצלך.</p>
+    ${L.rows.length ? `<table class="moves"><thead><tr><th>מצב</th><th>הזזה</th><th>עבד</th><th>החמיר</th></tr></thead><tbody>
+      ${L.rows.map(r => `<tr><td>${KIND_LABEL[r.kind]}</td><td>${esc(MOVE_INFO[r.type].name)}</td><td>${r.ok}/${r.n}</td><td>${r.worse}</td></tr>`).join('')}
+    </tbody></table>` : '<p class="mute">עוד אין המלצה שבוצעה ונבדקה.</p>'}
+    <p class="mute" style="margin-top:8px">${L.pending ? `⏳ ${L.pending} בבדיקה עכשיו · ` : ''}${L.open ? `${L.open} ממתינות לביצוע · ` : ''}בוצעו ${L.followed}, לא בוצעו ${L.ignored}.</p>
+    <p class="mute" style="font-size:.78rem">כשהזזה מסוימת לא עובדת לך פעמיים או יותר, וסוג אחר כן עבד, ההמלצה הבאה תעבור לזה שעובד לך.</p>
+  </div>`;
 }
 
 function bpChart(first) {
