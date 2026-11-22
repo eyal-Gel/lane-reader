@@ -1,13 +1,13 @@
 // מסכי קריאה, ארסנל, עוד (היסטוריה+הגדרות), לימוד
 import * as S from './store.js';
-import { laneStats, oilEstimate, oilLabel, insights, compareLanes, startAdvice, LEAVE_LABEL, sourceOf, SRC_LABEL } from './analysis.js';
+import { laneStats, oilEstimate, oilLabel, insights, compareLanes, startAdvice, LEAVE_LABEL, sourceOf, SRC_LABEL, measuredDrift } from './analysis.js';
 import { esc, go, toast, renderPlay } from './app.js';
 import { LEARN_HTML } from './learn.js';
 import { arrowNum, MOVE_INFO, geometry } from './geometry.js';
 import { registerRecs, learnedSummary, KIND_LABEL } from './learnloop.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
-export const APP_VERSION = '1.9';
+export const APP_VERSION = '2.0';
 let readScope = 'seg';   // seg | session
 let unlocked = null;     // מזהה אימון שנפתח למרות מצב רישום בלבד
 
@@ -19,8 +19,8 @@ const insHtml = i => `<div class="ins ${i.level}"><h4>${esc(i.title)}</h4>
 const srcLine = title => { const s = sourceOf(title); return `<div class="src">${s.kinds.map(k => `<span class="tag ${k}">${SRC_LABEL[k]}</span>`).join('')}${s.ref ? `<span class="ref">${esc(s.ref)}</span>` : ''}</div>`; };
 
 // השוואת שלוש ההזזות: מה כל אחת עושה לזווית ולשבירה
-const movesTable = (moves, rec) => `<table class="moves"><thead><tr><th>הזזה</th><th>עמידה</th><th>חץ</th><th>זווית</th><th>שבירה צפויה</th></tr></thead><tbody>
-  ${moves.map(m => `<tr class="${m.type === rec ? 'rec' : ''}"><td>${m.type === rec ? '✓ ' : ''}${esc(m.name)}</td><td>${m.stance}</td><td>${arrowNum(m.arrow) ? `חץ ${arrowNum(m.arrow)}` : m.arrow}</td><td>${m.launch}</td><td>${m.bp}</td></tr>`).join('')}
+const movesTable = (moves, rec) => `<table class="moves"><thead><tr><th>הזזה</th><th>עמידה</th><th>חץ</th><th>זווית</th><th>שבירה צפויה</th><th>מוקד</th></tr></thead><tbody>
+  ${moves.map(m => `<tr class="${m.type === rec ? 'rec' : ''}"><td>${m.type === rec ? '✓ ' : ''}${esc(m.name)}</td><td>${m.stance}</td><td>${arrowNum(m.arrow) ? `חץ ${arrowNum(m.arrow)}` : m.arrow}</td><td>${m.launch}</td><td>${m.bp}</td><td>${m.focal == null ? '—' : m.focal < 1 ? 'תעלה' : m.focal}</td></tr>`).join('')}
   </tbody></table><p class="mute" style="font-size:.8rem">${esc(MOVE_INFO[rec].what)} השבירה הצפויה היא הערכה גאומטרית של האפליקציה, מכוילת לזריקות שלך.</p>`;
 
 // ---------- קריאה ----------
@@ -263,6 +263,9 @@ export function renderMore() {
       <div class="grow"><span class="mute">דריפט רגיל (בורדים פנימה)</span><input type="number" id="bDr" inputmode="numeric" value="${st.drift ?? 2}"></div>
       <div class="grow"><span class="mute">הכדור מהרגל (בורדים)</span><input type="number" id="bOff" inputmode="numeric" value="${st.ballOff ?? 5}"></div>
     </div>
+    ${(() => { const md = measuredDrift(); return md ? `<p class="mute" style="margin:4px 0 0">📏 הדריפט שלך נמדד: <b>${md.drift}</b> בורדים (חציון של ${md.n} זריקות, פיזור ±${md.std}). ${md.drift !== Number(st.drift ?? 2) ? `<button class="btn sm" id="useMd">לעדכן ל-${md.drift}</button>` : '✓ תואם להגדרה'}</p>` : `<p class="mute" style="margin:4px 0 0">📏 כדי למדוד את הדריפט באמת: בכמה זריקות, סמן ב"סיום רגל" איפה הרגל עצרה. אחרי 5 זריקות הוא יופיע כאן.</p>`; })()}
+    <div class="row"><div class="grow"><span class="mute">נקודת מוקד ב-60 רגל (בורד)</span><input type="number" id="fcl" inputmode="numeric" value="${st.focal ?? 7}"></div></div>
+    <p class="mute" style="margin:4px 0 0">נקודת מוקד: הבורד בקצה המסלול שהקו הישר שלך (שחרור ← חץ) מכוון אליו. בסיס מקובל: בורד 7, הקצה של פין 6. בשמן ארוך באמת, פנימה יותר.</p>
     <p class="mute" style="margin:4px 0 0">דריפט: כמה בורדים רגל ההחלקה זזה מהעמידה עד קו העבירה (לימני, חיובי = שמאלה). הכדור משתחרר בצד היד, כמה בורדים מהרגל. משני אלה התוכנה מחשבת מאיפה הכדור באמת יוצא.</p>
     <label>יחידת מהירות</label><div class="seg" id="unit"><button data-v="kmh" class="${st.speedUnit === 'kmh' ? 'on' : ''}">קמ"ש</button><button data-v="mph" class="${st.speedUnit === 'mph' ? 'on' : ''}">מייל לשעה</button></div>
     <label>אולם ברירת מחדל</label><input type="text" id="center" value="${esc(st.center)}"></div>
@@ -307,6 +310,8 @@ export function renderMore() {
   seg('hand', 'hand'); seg('style', 'style'); seg('unit', 'speedUnit');
   $('#center', root).onchange = e => { st.center = e.target.value.trim(); S.save(); };
   $('#bDr', root).onchange = e => { st.drift = Math.max(-8, Math.min(8, Math.round(Number(e.target.value) || 0))); S.save(); toast(`דריפט רגיל: ${st.drift}`); };
+  $('#useMd', root)?.addEventListener('click', () => { st.drift = measuredDrift().drift; S.save(); toast(`דריפט רגיל עודכן ל-${st.drift}`); renderMore(); });
+  $('#fcl', root).onchange = e => { st.focal = Math.max(1, Math.min(30, Math.round(Number(e.target.value) || 7))); S.save(); toast(`נקודת מוקד: בורד ${st.focal}`); };
   $('#bOff', root).onchange = e => { st.ballOff = Math.max(0, Math.min(12, Math.round(Number(e.target.value) || 0))); S.save(); toast(`הכדור ${st.ballOff} בורדים מהרגל`); };
   const clampB = v => Math.max(1, Math.min(39, Math.round(Number(v) || 0)));
   ['hB', 'hC', 'hA'].forEach(id => $('#' + id, root).onchange = () => {

@@ -40,7 +40,7 @@ export const ALL_PINS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 const defaults = () => ({
   // ברירות מחדל כלליות. מסך הפתיחה (onboarded=false) מבקש מכל שחקן חדש את הנתונים שלו
-  settings: { hand: 'R', style: 'one', center: '', speedUnit: 'kmh', home: { board: 18, cm: 0, arrow: 10 }, drift: 2, ballOff: 5, onboarded: false },
+  settings: { hand: 'R', style: 'one', center: '', speedUnit: 'kmh', home: { board: 18, cm: 0, arrow: 10 }, drift: 2, ballOff: 5, focal: 7, onboarded: false },
   balls: [],
   sessions: [],
   shots: [],

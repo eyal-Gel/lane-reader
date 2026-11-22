@@ -24,6 +24,17 @@ export function projectBp(release, arrow) {
   return arrow + (arrow - release) * (BP_FT - af) / af;
 }
 
+// נקודת מוקד (Rob Romer): לאן הקו הישר שחרור → חץ מגיע ב-60 רגל, בקצה המסלול.
+// החצים בערך ב-15 רגל, אז בורד אחד בחץ ≈ 4 בורדים במוקד
+export const FOCAL_FT = 60;
+export const focalOf = (release, arrow) => r1(release + (arrow - release) * FOCAL_FT / arrowFt(arrow));
+// מוקד → שחרור → גלישה (+ הכדור מהרגל) → עמידה (− הדריפט)
+export function standForFocal(arrow, focal, drift, cfg = bodyCfg()) {
+  const k = FOCAL_FT / arrowFt(arrow);
+  const release = (focal - k * arrow) / (1 - k);
+  return { release: Math.round(release), finish: Math.round(release + cfg.ballOff), stance: Math.round(release + cfg.ballOff - drift) };
+}
+
 // כיול אישי: כמה בורדים השבירה בפועל שונה מהקו הישר (הכדור מתחיל לפנות, סיבוב, מהירות)
 export function calibrate(first, cfg) {
   const d = first.filter(s => has(s.stance?.board) && has(s.arrow) && has(s.bp))
@@ -53,7 +64,7 @@ export function moveOptions(stance, arrow, drift, dir, offset = 0, cfg = bodyCfg
   if (!has(stance) || !has(arrow)) return [];
   return [['feet', 2, 0], ['21', 2, 1], ['22', 2, 2]].map(([type, ds, da]) => {
     const s = stance + ds * dir, a = arrow + da * dir;
-    return { type, name: MOVE_INFO[type].name, stance: s, finish: s + drift, arrow: a, launch: s - a, bp: r1(projectBp(releaseOf(s + drift, cfg), a) + offset) };
+    return { type, name: MOVE_INFO[type].name, stance: s, finish: s + drift, arrow: a, launch: s - a, bp: r1(projectBp(releaseOf(s + drift, cfg), a) + offset), focal: Math.round(focalOf(releaseOf(s + drift, cfg), a)) };
   });
 }
 

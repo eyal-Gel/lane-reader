@@ -3,9 +3,10 @@ import * as S from './store.js';
 import { renderLane, renderDeck } from './lane.js';
 import { classifyLeave, insights, openingPlan } from './analysis.js';
 import { renderRead, renderBalls, renderMore, renderLearn, importTransfer } from './views.js';
-import { geometry, arrowNum, bodyCfg, releaseOf } from './geometry.js';
+import { geometry, arrowNum, bodyCfg, releaseOf, focalOf } from './geometry.js';
 import { renderOnboard } from './onboard.js';
 import { registerRecs, updateRecs, eventText } from './learnloop.js';
+import { QUICK } from './tips.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -350,7 +351,9 @@ export function renderPlay() {
     $('#v-bp').textContent = entry.bp ?? '—';
     root.querySelectorAll('.rf [data-rf]').forEach(b => b.classList.toggle('on', Number(b.dataset.rf) === entry.bp));
     const g = geometry(entry.stance.board, entry.arrow, entry.bp);
-    $('#s-arrow').textContent = [arrowNum(entry.arrow) ? `חץ ${arrowNum(entry.arrow)}` : '', g.launch !== undefined ? `זווית ${g.launch}` : ''].filter(Boolean).join(' · ');
+    const cfgB = bodyCfg(S.getDb().settings), finB = entry.finish ?? (entry.stance.board != null ? entry.stance.board + cfgB.drift : null);
+    const foc = finB != null && entry.arrow != null ? Math.round(focalOf(releaseOf(finB, cfgB), entry.arrow)) : null;
+    $('#s-arrow').textContent = [arrowNum(entry.arrow) ? `חץ ${arrowNum(entry.arrow)}` : '', g.launch !== undefined ? `זווית ${g.launch}` : '', foc !== null ? (foc < 1 ? 'מוקד בתעלה' : `מוקד ${foc}`) : ''].filter(Boolean).join(' · ');
     $('#s-bp').textContent = g.swing !== undefined ? `${g.swing} מהחץ · ${g.hook} לכיס` : '';
   };
   draw(); syncSteppers();
@@ -412,16 +415,6 @@ function stepper(k, lbl, v) {
     ${k === 'arrow' || k === 'bp' ? `<div class="sub" id="s-${k}"></div><button class="forget" data-forget="${k}">לא זוכר</button>` : ''}</div>`;
 }
 
-const QUICK = {
-  strike: 'סטרייק! 🔥 רשום לעצמך: ככה זה מרגיש כשהקו נכון.',
-  weak10: '10 חלש: הכדור הגיע בלי מספיק זווית או איבד אנרגיה. אם זה חוזר, זה מסר מהמסלול. (אם פין 6 עף חזק מסביב ל-10, סמן "10 חזק".)',
-  strong10: '10 חזק: פין 6 עף מסביב. בדרך כלל זו זריקה טובה ופשוט חוסר מזל. מגיבים רק אם זה חוזר.',
-  ambig: 'פין 7 בודד: לא חד-משמעי. הוא יכול לבוא מכניסה גבוהה או מכניסה שטוחה, אז אל תסיק ממנו לבד.',
-  light: 'כניסה חלשה: הכדור לא פנה מספיק, כנראה יש יותר שמן בקו שלך.',
-  high: 'כניסה גבוהה: הכדור פנה מוקדם מדי. סימן אפשרי שהקו מתייבש.',
-  head: 'פספוס ראש: הכדור לא הגיע לכיס בכלל. בדוק קודם אם פגעת בחץ שתכננת.',
-  other: 'נרשם. עוד כמה זריקות ונראה דפוס.',
-};
 
 function saveShot(s, ctx, game) {
   const hand = S.getDb().settings.hand;

@@ -1,6 +1,8 @@
 // מנוע קריאת מסלול: סטטיסטיקה + תובנות מלמדות (מה ראינו / מה זה אומר / מה לעשות / למה)
 import { getDb, ballById, ballStrength, isSplit, lastSanded, gamesSinceSand, recStats, patternOf, curSegIdx } from './store.js';
-import { calibrate, moveOptions, chooseMove, lineRead, arrowLabel, MOVE_INFO, bodyCfg, finishOf } from './geometry.js';
+import { calibrate, moveOptions, chooseMove, lineRead, arrowLabel, MOVE_INFO, bodyCfg, finishOf, } from './geometry.js';
+import { focalInsight } from './focal.js';
+export { measuredDrift } from './focal.js';
 
 const MIRROR = { 1: 1, 2: 3, 3: 2, 4: 6, 5: 5, 6: 4, 7: 10, 8: 9, 9: 8, 10: 7 };
 const norm = (pins, hand) => hand === 'L' ? pins.map(p => MIRROR[p]) : pins;
@@ -317,6 +319,7 @@ export function insights(shots, lane, hand, session) {
     });
   }
 
+  const fi = focalInsight(stR, arrowNow, driftNow, cfg, inW, outW); if (fi) out.push(fi); // נקודת מוקד
   // 3. טרנזישן: השוואת חצי ראשון ושני של הסשן
   if (all.n >= 10) {
     const h = all.first.length >> 1;
@@ -459,13 +462,13 @@ export function openingPlan(shots, lane, hand, session) {
   }
   return { ...base, reason: st.strikePct >= 40 ? 'החימום הלך טוב בקו הזה. מתחילים בדיוק ממנו.' : 'אין עדיין דפוס ברור. מתחילים מהקו של החימום ושמים לב לשלוש הזריקות הראשונות.' };
 }
-
 // ---------- מקור ורמת ביטחון לכל תובנה ----------
 // principle = עיקרון מקובל בהדרכת באולינג, estimate = הערכה/ספים של האפליקציה, data = מחושב מהזריקות שלך
 const SRC = [
   ['צריך עוד', ['estimate']],
   ['קודם דיוק', ['principle', 'estimate'], 'עקביות לפני קריאה: Bowling This Month, NBA'],
   ['מרחב טעות', ['data']],
+  ['נקודת מוקד', ['principle', 'estimate'], 'כיוון לנקודת מוקד ב-60 רגל: Rob Romer (Storm)'],
   ['נטייה: זריקה ישרה', ['data', 'principle'], 'עקביות לפני קריאה: Bowling This Month, NBA'],
   ['השבירה מפוזרת', ['principle', 'estimate']],
   ['המהירות קופצת', ['principle'], 'מהירות מאריכה את ההחלקה: Bowlingball.com, USBC'],
