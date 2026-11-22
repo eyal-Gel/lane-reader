@@ -169,3 +169,4 @@ textarea { min-height: 64px; resize: vertical; }
 .brand { font-family: 'Arial Black', Arial, sans-serif; letter-spacing: .04em; color: var(--acc); }
 
 .chips button.warnc { background: var(--acc); color: #2a1a00; border-color: var(--acc); font-weight: 700; }
+.terms { padding-inline-start: 20px; margin: 8px 0 12px; } .terms li { margin-bottom: 7px; line-height: 1.5; font-size: .88rem; }

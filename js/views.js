@@ -3,11 +3,12 @@ import * as S from './store.js';
 import { laneStats, oilEstimate, oilLabel, insights, compareLanes, startAdvice, LEAVE_LABEL, sourceOf, SRC_LABEL, measuredDrift } from './analysis.js';
 import { esc, go, toast, renderPlay } from './app.js';
 import { LEARN_HTML } from './learn.js';
+import { TERMS_LIST, TERMS_SHORT } from './terms.js';
 import { arrowNum, MOVE_INFO, geometry } from './geometry.js';
 import { registerRecs, learnedSummary, KIND_LABEL } from './learnloop.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
-export const APP_VERSION = '2.0';
+export const APP_VERSION = '2.1';
 let readScope = 'seg';   // seg | session
 let unlocked = null;     // מזהה אימון שנפתח למרות מצב רישום בלבד
 
@@ -283,7 +284,8 @@ export function renderMore() {
     </div>
     <div class="card"><h2>גיבוי</h2><p class="mute">הנתונים שמורים רק בטלפון הזה. כדאי לייצא מדי פעם.</p>
       <div class="row"><button class="btn grow" id="exp">⬇️ ייצוא</button><label class="btn grow" style="margin:0;text-align:center;color:var(--text)">⬆️ ייבוא<input type="file" id="imp" accept=".json" hidden></label></div></div>
-    <p class="mute" style="text-align:center">EGG קורא המסלולים · גרסה ${APP_VERSION}<br>© 2026 אייל גלברג (EGG · Eyal Gelberg Game). כל הזכויות שמורות.</p>`;
+    <div class="card"><details><summary><b>📋 הסתייגות ותנאי שימוש</b></summary>${TERMS_LIST}</details></div>
+    <p class="mute" style="text-align:center">EGG קורא המסלולים · גרסה ${APP_VERSION}<br>${TERMS_SHORT}<br>© 2026 אייל גלברג (EGG · Eyal Gelberg Game). כל הזכויות שמורות.</p>`;
   // שחקנים
   $('#addProf', root).onclick = () => {
     const name = (prompt('שם השחקן החדש:', 'אורח') || '').trim();

@@ -7,6 +7,7 @@ import { geometry, arrowNum, bodyCfg, releaseOf, focalOf } from './geometry.js';
 import { renderOnboard } from './onboard.js';
 import { registerRecs, updateRecs, eventText } from './learnloop.js';
 import { QUICK } from './tips.js';
+import { TERMS_VERSION, renderTermsGate } from './terms.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -251,6 +252,8 @@ export function renderPlay() {
       onDone: fresh => { renderPlay(); renderHeader(); if (fresh) toast('מוכן! עכשיו הוסף את הכדורים שלך בלשונית <b>ארסנל</b>, ואחר כך פתח אימון כאן.', 6000); },
     });
   }
+  const st0 = S.getDb().settings;
+  if (st0.termsOk !== TERMS_VERSION) return renderTermsGate(root, () => { st0.termsOk = TERMS_VERSION; S.save(); renderPlay(); });
   const s = S.currentSession();
   if (!s) return renderStart(root);
   const warm = s.phase === 'warm';
