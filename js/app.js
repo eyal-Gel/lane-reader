@@ -317,7 +317,7 @@ export function renderPlay() {
       <div class="actions">
         <button class="btn pri full big" id="saveShot"></button>
         <button class="btn sm" id="undo">↩︎ בטל אחרונה</button>
-        <button class="btn sm" id="switchLanes">עברתי מסלולים</button>
+        <button class="btn sm" id="switchLanes">עברתי מסלולים</button><button class="btn sm danger" id="endNow">סיום אימון</button>
         <button class="btn sm full" id="patBtn">🛢️ עדכון שימון: מצב ותבנית</button>
       </div>
     </div>`;
@@ -400,7 +400,7 @@ export function renderPlay() {
   root.querySelectorAll('.stepper [data-forget]').forEach(btn => btn.addEventListener('click', () => { entry[btn.dataset.forget] = null; draw(); syncSteppers(); }));
   $('#qChips')?.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; entry.quality = entry.quality === b.dataset.v ? null : b.dataset.v; renderPlay(); });
   $('#undo').onclick = () => { if (S.undoShot(s.id)) { entryKey = ''; renderPlay(); toast('הזריקה האחרונה בוטלה'); } };
-  $('#switchLanes').onclick = () => renderSwitch(root, s);
+  $('#switchLanes').onclick = () => renderSwitch(root, s); $('#endNow').onclick = () => endSession(ctx.frame > 0 || ctx.shot > 0);
   $('#patBtn').onclick = () => renderPatternForm(root, s);
   $('#warmDone')?.addEventListener('click', () => renderWarmEnd(root, s));
   $('#saveShot').onclick = () => saveShot(s, ctx, game);
@@ -480,8 +480,8 @@ function renderWarmEnd(root, s) {
   $('#backWarm').onclick = () => renderPlay();
 }
 
-function endSession() {
-  if (!confirm('לסיים את האימון? הנתונים נשמרים ותוכל לראות אותם בהיסטוריה.')) return;
+function endSession(midGame = false) {
+  if (!confirm(`לסיים את האימון?${midGame ? ' המשחק הנוכחי לא הושלם, והוא יישמר עם הניקוד עד הפריים האחרון שזרקת.' : ''} הנתונים נשמרים ותוכל לראות אותם בהיסטוריה.`)) return;
   const db = S.getDb();
   db.viewSessionId = db.currentSessionId;
   db.currentSessionId = null; S.save();
