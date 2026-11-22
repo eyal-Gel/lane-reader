@@ -1,7 +1,7 @@
 // מנוע קריאת מסלול: סטטיסטיקה + תובנות מלמדות (מה ראינו / מה זה אומר / מה לעשות / למה)
 import { getDb, ballById, ballStrength, isSplit, lastSanded, gamesSinceSand, recStats, patternOf, curSegIdx } from './store.js';
 import { calibrate, moveOptions, chooseMove, lineRead, arrowLabel, MOVE_INFO, bodyCfg, finishOf, } from './geometry.js';
-import { focalInsight } from './focal.js';
+import { focalInsight } from './focal.js'; import { drillInsight } from './drill.js';
 export { measuredDrift } from './focal.js';
 
 const MIRROR = { 1: 1, 2: 3, 3: 2, 4: 6, 5: 5, 6: 4, 7: 10, 8: 9, 9: 8, 10: 7 };
@@ -42,12 +42,12 @@ export const LEAVE_LABEL = {
 // זריקה "נקייה" = בוצעה כמו שתוכנן. רק היא נכנסת לקריאת המסלול
 // פספוס עם בורד ידוע נחשב נקי לקריאה: אנחנו יודעים בדיוק מה הכדור עשה
 // זריקה "ישר/חזק מדי" = הזריקה השתנתה, לא המסלול. לכן היא לא נקייה גם אם עברה בחץ
-export const isClean = s => !s.straight && (!s.exec || s.exec === 'ok' || s.actualKnown);
+export const isClean = s => !s.straight && !s.drill && (!s.exec || s.exec === 'ok' || s.actualKnown);
 
 export function laneStats(shots, lane, hand) {
-  const firstAll = shots.filter(s => s.shot === 0 && s.lane === lane && s.rack.length === 10);
+  const firstAll = shots.filter(s => !s.drill && s.shot === 0 && s.lane === lane && s.rack.length === 10); // תרגול טכניקה לא נכנס לסטטיסטיקה
   const first = firstAll.filter(isClean);
-  const spares = shots.filter(s => s.lane === lane && s.rack.length < 10);
+  const spares = shots.filter(s => !s.drill && s.lane === lane && s.rack.length < 10);
   const exec = { in: 0, out: 0, unsure: 0 };
   firstAll.forEach(s => { if (exec[s.exec] !== undefined) exec[s.exec]++; });
   const cats = {};
@@ -153,7 +153,7 @@ function wornNote(id) {
 
 // ---------- תובנות ----------
 export function insights(shots, lane, hand, session) {
-  const out = [];
+  const out = []; const dc = drillInsight(shots, lane, hand); if (dc) out.push(dc); // תרגול טכניקה: כרטיס נפרד
   const two = getDb().settings.style === 'two';
   const all = laneStats(shots, lane, hand);
   const recent = laneStats(shots.slice(-30), lane, hand);
@@ -488,7 +488,7 @@ const SRC = [
   ['המסלולים', ['data']],
   ['שימון טרי', ['principle']], ['שימון משוחק', ['principle']], ['מסלול יבש', ['principle']],
   ['עבד לך בעבר', ['data']],
-  ['שתי ידיים', ['estimate']],
+  ['שתי ידיים', ['estimate']], ['תרגול טכניקה', ['data', 'principle'], 'למידה מוטורית: ירידה זמנית בביצוע בזמן שינוי טכניקה היא צפויה'],
   ['כלל ה-31', ['principle', 'data'], 'כלל ה-31: BowlingLife, Human Kinetics'],
   ['ההמלצות שלך', ['data']],
 ];

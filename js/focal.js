@@ -8,7 +8,7 @@ const r1 = x => Math.round(x * 10) / 10;
 
 // הדריפט שלך באמת: חציון של (סיום רגל − עמידה) בכל הזריקות שסימנת בהן סיום רגל
 export function measuredDrift() {
-  const d = getDb().shots.filter(s => s.finishSet && Number.isFinite(s.finish) && Number.isFinite(s.stance?.board)).map(s => s.finish - s.stance.board);
+  const d = getDb().shots.filter(s => !s.drill && s.finishSet && Number.isFinite(s.finish) && Number.isFinite(s.stance?.board)).map(s => s.finish - s.stance.board);
   if (d.length < 5) return null;
   return { drift: Math.round(median(d)), n: d.length, std: r1(std(d)) };
 }

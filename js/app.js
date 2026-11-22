@@ -6,7 +6,7 @@ import { renderRead, renderBalls, renderMore, renderLearn, importTransfer } from
 import { geometry, arrowNum, bodyCfg, releaseOf, focalOf } from './geometry.js';
 import { renderOnboard } from './onboard.js';
 import { registerRecs, updateRecs, eventText } from './learnloop.js';
-import { QUICK } from './tips.js';
+import { QUICK } from './tips.js'; import { drillBar, bindDrill, drillName } from './drill.js';
 import { TERMS_VERSION, renderTermsGate } from './terms.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -289,7 +289,7 @@ export function renderPlay() {
       <button class="lanetag" id="laneTog" ${ctx.shot > 0 ? 'disabled' : ''}>מסלול ${laneName(s, entry.lane)} ⇄</button>
     </div>
     ${balls.length ? `<div class="chips" id="ballChips">${balls.map(b => `<button data-id="${b.id}" class="${b.id === entry.ball ? 'on' : ''}">${esc(b.name)}${b.spareOnly ? ' (ספייר)' : ''}</button>`).join('')}</div>` : `<p class="mute">אין כדורים בארסנל. <a href="#" id="toBalls" style="color:var(--acc)">הוסף כדור</a></p>`}
-    ${planNow ? `<p class="mute" style="margin:6px 0 0">📋 לפי תוכנית הפתיחה: עמידה ${planNow.stance}, ${arrowNum(planNow.arrow) ? `חץ ${arrowNum(planNow.arrow)}` : `בורד ${planNow.arrow}`}</p>` : ''}
+    ${drillBar(s, warm)}${planNow ? `<p class="mute" style="margin:6px 0 0">📋 לפי תוכנית הפתיחה: עמידה ${planNow.stance}, ${arrowNum(planNow.arrow) ? `חץ ${arrowNum(planNow.arrow)}` : `בורד ${planNow.arrow}`}</p>` : ''}
     <div class="entry" style="margin-top:8px">
       <div class="lanebox"><svg id="laneSvg"></svg></div>
       <div class="ctl">
@@ -383,7 +383,7 @@ export function renderPlay() {
     $('#actualRow').hidden = !['left', 'right'].includes(entry.miss);
     $('#v-act').textContent = entry.actual ?? '—';
   });
-  $('#straightTog').onclick = e => { entry.straight = !entry.straight; e.currentTarget.classList.toggle('on', entry.straight); e.currentTarget.classList.toggle('warnc', entry.straight); };
+  $('#straightTog').onclick = e => { entry.straight = !entry.straight; e.currentTarget.classList.toggle('on', entry.straight); e.currentTarget.classList.toggle('warnc', entry.straight); }; bindDrill(root, s, renderPlay);
   root.querySelectorAll('#actualRow [data-act]').forEach(btn => btn.addEventListener('click', () => {
     const d = Number(btn.dataset.act);
     if (!d) entry.actual = null;
@@ -425,7 +425,7 @@ function saveShot(s, ctx, game) {
     sessionId: s.id, seg: S.curSegIdx(s), game, frame: ctx.frame, shot: ctx.shot, lane: entry.lane,
     ball: entry.ball, stance: { ...entry.stance }, finish: entry.finish, finishSet: !!entry.finishSet, arrow: entry.arrow, bp: entry.bp,
     speed: entry.speed === '' ? null : Number(entry.speed), quality: entry.quality, exec: entry.exec,
-    ...(entry.straight ? { straight: true } : {}),
+    ...(entry.straight ? { straight: true } : {}), ...(s.drill && !ctx.warm ? { drill: s.drill } : {}),
     // אם ידוע באיזה בורד הכדור עבר: החץ = מה שקרה בפועל, והיעד נשמר בנפרד
     ...(entry.actual != null && entry.exec !== 'ok' ? { target: entry.arrow, arrow: entry.actual, actualKnown: true } : {}),
     rack: [...ctx.rack], left: [...entry.left].sort((a, b) => a - b),
@@ -437,8 +437,8 @@ function saveShot(s, ctx, game) {
   const evs = updateRecs(s);
   const evHtml = evs.map(e => `<div style="margin-top:6px">${esc(eventText(e))}</div>`).join('');
   if (s.liveTips === false && !ctx.warm) { toast('נרשם ✓', 1200); entryKey = ''; renderPlay(); return; }
-  if (ctx.rack.length === 10 && shot.straight) {
-    toast('נרשם כזריקה ישרה/חזקה. היא נכנסת לניקוד ולכרטיס "נטייה", אבל לא לקריאת המסלול: הפעם השתנתה הזריקה, לא המסלול.');
+  if (ctx.rack.length === 10 && (shot.straight || shot.drill)) {
+    toast(shot.drill ? `נרשם כתרגול ${drillName(shot.drill)} 🧪. נכנס לניקוד ולכרטיס התרגול, לא לקריאת המסלול ולא להמלצות.` : 'נרשם כזריקה ישרה/חזקה. היא נכנסת לניקוד ולכרטיס "נטייה", אבל לא לקריאת המסלול: הפעם השתנתה הזריקה, לא המסלול.');
   } else if (ctx.rack.length === 10 && shot.exec !== 'ok') {
     const side = entry.miss === 'left' ? 'שמאלה' : 'ימינה';
     toast(shot.exec === 'unsure' ? 'נרשם. זריקה שלא בטוח לגביה לא נכנסת לקריאת המסלול, רק לניקוד.'
