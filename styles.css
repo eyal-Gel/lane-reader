@@ -172,3 +172,4 @@ textarea { min-height: 64px; resize: vertical; }
 .terms { padding-inline-start: 20px; margin: 8px 0 12px; } .terms li { margin-bottom: 7px; line-height: 1.5; font-size: .88rem; }
 .drillbar { margin-top: 8px; } details.drillbar summary { cursor: pointer; font-size: .85rem; color: var(--mute, #999); padding: 4px 0; }
 .card.drillbar.on { border-color: var(--acc); }
+.trialbar { margin-top: 8px; padding: 6px 10px; border: 1px dashed var(--info); border-radius: 10px; color: var(--info); font-size: .85rem; text-align: center; }

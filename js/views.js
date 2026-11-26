@@ -8,7 +8,7 @@ import { arrowNum, MOVE_INFO, geometry } from './geometry.js';
 import { registerRecs, learnedSummary, KIND_LABEL } from './learnloop.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
-export const APP_VERSION = '2.4';
+export const APP_VERSION = '2.5';
 let readScope = 'seg';   // seg | session
 let unlocked = null;     // מזהה אימון שנפתח למרות מצב רישום בלבד
 
@@ -275,7 +275,7 @@ export function renderMore() {
       const games = Array.from({ length: s.games }, (_, g) => S.scoreGame(S.gameShots(s.id, g)).total).filter(Boolean);
       return `<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:8px 0" data-id="${s.id}">
         <div class="grow"><b>${new Date(s.date).toLocaleDateString('he-IL')}</b> · ${esc(s.center)}${s.id === db.currentSessionId ? ' <span style="color:var(--acc)">(פעיל)</span>' : ''}
-        <div class="mute">${(s.segs || []).map(g => `${g.laneNums.L}|${g.laneNums.R} ${S.OIL_LABEL[g.oil]}`).join(' → ')} · משחקים: ${games.join(', ') || '—'}${S.sessionShots(s.id).some(x => x.drill) ? ' · 🧪 כולל תרגול טכניקה' : ''}${s.type === 'warmonly' ? ' · 🔥 חימום בלבד' : ''}</div></div>
+        <div class="mute">${(s.segs || []).map(g => `${g.laneNums.L}|${g.laneNums.R} ${S.OIL_LABEL[g.oil]}`).join(' → ')} · משחקים: ${games.join(', ') || '—'}${S.sessionShots(s.id).some(x => x.drill) ? ' · 🧪 כולל תרגול טכניקה' : ''}${s.type === 'warmonly' ? ' · 🔥 חימום בלבד' : ''}${s.trial ? ' · 🧪 ניסיון (יימחק בסיום)' : ''}</div></div>
         <button class="btn sm view">קריאה</button><button class="btn sm danger del">🗑</button></div>`;
     }).join('') : '<p class="mute">עוד אין אימונים.</p>'}</div>
     <div class="card"><h2>📲 העברה למכשיר אחר</h2>

@@ -159,6 +159,7 @@ export function newSession(opts) {
     note: opts.note || '',
     liveTips: opts.liveTips !== false,   // false = רישום בלבד (ליגה/תחרות)
     phase: opts.warmup ? 'warm' : 'play', // חימום: זריקות בלי ניקוד, המלצות פעילות תמיד
+    ...(opts.trial ? { trial: true } : {}), // ניסיון: נמחק כולו בסיום
     plan: null,                          // תוכנית פתיחה שנבנתה בסוף החימום
     games: 1,
     // קטעים: כל מעבר לזוג מסלולים אחר (או שינוי מצב שימון) פותח קטע חדש
@@ -231,6 +232,7 @@ export const gameShots = (sid, g) => db.shots.filter(x => x.sessionId === sid &&
 export function deleteSession(id) {
   db.sessions = db.sessions.filter(s => s.id !== id);
   db.shots = db.shots.filter(x => x.sessionId !== id);
+  db.recs = (db.recs || []).filter(r => r.sessionId !== id); // גם ההמלצות של האימון, כדי שלא ייספרו בלולאת הלמידה
   if (db.currentSessionId === id) db.currentSessionId = null;
   save();
 }

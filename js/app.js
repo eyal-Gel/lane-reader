@@ -14,7 +14,7 @@ const $ = (sel, root = document) => root.querySelector(sel);
 
 let entry = null;      // מצב הזריקה שבהזנה
 let entryKey = '';     // משחק-פריים-זריקה, כדי לאתחל רק כשעוברים זריקה
-let startForm = { oil: 'fresh', startLane: 'L', alternate: true, type: 'training', liveTips: true, warmup: false };
+let startForm = { oil: 'fresh', startLane: 'L', alternate: true, type: 'training', liveTips: true, warmup: false, trial: false };
 
 export function toast(html, ms = 4200) {
   const t = $('#toast');
@@ -78,6 +78,8 @@ function renderStart(root) {
     <label>החלפת מסלול בכל פריים</label>
     <div class="seg" id="sAlt"><button data-v="1">כן (מצב ליגה)</button><button data-v="0">לא, מסלול אחד</button></div>
     ${patternFields(S.centerPattern(db.settings.center))}
+    <label>ניסיון בלבד?</label><div class="seg" id="sTrial"><button data-v="0">אימון אמיתי</button><button data-v="1">🧪 ניסיון, לא לשמור</button></div>
+    <p class="mute" style="margin:4px 0 0">בניסיון הכול עובד כרגיל, ובסיום הכול נמחק: זריקות, המלצות ודריפט. הגדרות וכדורים שתשנה כן נשמרים.</p>
     <label>הערה</label><input type="text" id="sNote" placeholder="למשל: אחרי ליגה, מזגן חזק...">
     <div style="height:12px"></div>
     <button class="btn pri big" id="sGo">יאללה, מתחילים</button>
@@ -98,11 +100,11 @@ function renderStart(root) {
     el.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; db.settings[key] = b.dataset.v; S.save(); sync(); });
     sync();
   };
-  bindSet('sHand', 'hand'); bindSet('sStyle', 'style'); bindSeg('sStart', 'startLane'); bindSeg('sAlt', 'alternate', v => v === '1');
+  bindSet('sHand', 'hand'); bindSet('sStyle', 'style'); bindSeg('sStart', 'startLane'); bindSeg('sAlt', 'alternate', v => v === '1'); bindSeg('sTrial', 'trial', v => v === '1');
   $('#sGo', root).onclick = () => {
     const center = $('#sCenter', root).value.trim() || db.settings.center;
     db.settings.center = center;
-    S.newSession({ center, type: f.type, laneL: $('#sL', root).value, laneR: $('#sR', root).value, oil: f.oil, startLane: f.startLane, alternate: f.alternate, liveTips: f.liveTips, warmup: f.warmup, note: $('#sNote', root).value });
+    S.newSession({ center, type: f.type, laneL: $('#sL', root).value, laneR: $('#sR', root).value, oil: f.oil, startLane: f.startLane, alternate: f.alternate, liveTips: f.liveTips, warmup: f.warmup, trial: f.trial, note: $('#sNote', root).value }); f.trial = false; // ניסיון לא נשאר דלוק לאימון הבא
     S.setPattern(S.currentSession(), readPattern(root));
     entryKey = '';
     renderPlay();
@@ -285,7 +287,7 @@ export function renderPlay() {
       <button class="lanetag" id="laneTog" ${ctx.shot > 0 ? 'disabled' : ''}>מסלול ${laneName(s, entry.lane)} ⇄</button>
     </div>
     ${balls.length ? `<div class="chips" id="ballChips">${balls.map(b => `<button data-id="${b.id}" class="${b.id === entry.ball ? 'on' : ''}">${esc(b.name)}${b.spareOnly ? ' (ספייר)' : ''}</button>`).join('')}</div>` : `<p class="mute">אין כדורים בארסנל. <a href="#" id="toBalls" style="color:var(--acc)">הוסף כדור</a></p>`}
-    ${drillBar(s, warm)}${planNow ? `<p class="mute" style="margin:6px 0 0">📋 לפי תוכנית הפתיחה: עמידה ${planNow.stance}, ${arrowNum(planNow.arrow) ? `חץ ${arrowNum(planNow.arrow)}` : `בורד ${planNow.arrow}`}</p>` : ''}
+    ${s.trial ? '<div class="trialbar">🧪 מצב ניסיון · בסיום הכול נמחק</div>' : ''}${drillBar(s, warm)}${planNow ? `<p class="mute" style="margin:6px 0 0">📋 לפי תוכנית הפתיחה: עמידה ${planNow.stance}, ${arrowNum(planNow.arrow) ? `חץ ${arrowNum(planNow.arrow)}` : `בורד ${planNow.arrow}`}</p>` : ''}
     <div class="entry" style="margin-top:8px">
       <div class="lanebox"><svg id="laneSvg"></svg></div>
       <div class="ctl">
@@ -464,6 +466,7 @@ function renderWarmEnd(root, s) {
     <div class="actions"><button class="btn pri full big" id="goGame">${only ? '✓ שמור תוכנית וסיים' : 'מתחילים משחק 1'}</button><button class="btn full sm" id="backWarm">↩︎ עוד זריקות חימום</button></div>`;
   $('#goGame').onclick = () => {
     s.plan = plan; s.phase = 'play';
+    if (s.trial) return endTrial(true);
     if (only) { const db = S.getDb(); db.viewSessionId = s.id; db.currentSessionId = null; S.save(); go('read'); toast('התוכנית נשמרה. בהצלחה בליגה! 🎳'); return; }
     S.save(); entryKey = ''; renderPlay(); toast('בהצלחה! 🎳');
   };
@@ -471,11 +474,17 @@ function renderWarmEnd(root, s) {
 }
 
 function endSession(midGame = false) {
+  if (S.currentSession()?.trial) return endTrial();
   if (!confirm(`לסיים את האימון?${midGame ? ' המשחק הנוכחי לא הושלם, והוא יישמר עם הניקוד עד הפריים האחרון שזרקת.' : ''} הנתונים נשמרים ותוכל לראות אותם בהיסטוריה.`)) return;
   const db = S.getDb();
   db.viewSessionId = db.currentSessionId;
   db.currentSessionId = null; S.save();
   go('read');
+}
+// סיום ניסיון: מוחקים הכול, כאילו לא היה
+function endTrial(skipAsk = false) {
+  if (!skipAsk && !confirm('לסיים את הניסיון? כל הזריקות וההמלצות שלו יימחקו.')) return;
+  S.deleteSession(S.getDb().currentSessionId); entryKey = ''; go('play'); toast('הניסיון הסתיים ונמחק. שום דבר לא נשמר 🧹');
 }
 
 // ---------- אתחול ----------
