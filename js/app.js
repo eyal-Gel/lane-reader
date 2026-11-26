@@ -6,7 +6,7 @@ import { renderRead, renderBalls, renderMore, renderLearn, importTransfer } from
 import { geometry, arrowNum, bodyCfg, releaseOf, focalOf } from './geometry.js';
 import { renderOnboard } from './onboard.js';
 import { registerRecs, updateRecs, eventText } from './learnloop.js';
-import { QUICK } from './tips.js'; import { drillBar, bindDrill, drillName } from './drill.js';
+import { QUICK } from './tips.js'; import { planCards, laneName } from './warmplan.js'; import { drillBar, bindDrill, drillName } from './drill.js';
 import { TERMS_VERSION, renderTermsGate } from './terms.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -46,10 +46,6 @@ function renderHeader() {
   $('#sessionInfo').textContent = `${s.center}${nums} · ${S.OIL_LABEL[seg.oil]}${patTxt} · ${s.phase === 'warm' ? 'חימום' : `משחק ${s.games}`}`;
 }
 
-const laneName = (s, lane) => {
-  const seg = S.segOf(s, S.curSegIdx(s));
-  return `${lane === 'L' ? 'שמאל' : 'ימין'}${seg.laneNums[lane] ? ' · ' + seg.laneNums[lane] : ''}`;
-};
 
 // ---------- פתיחת אימון ----------
 function renderStart(root) {
@@ -61,7 +57,7 @@ function renderStart(root) {
     ${db.balls.length ? '' : `<p class="mute">💡 עוד לא הוספת כדורים. כדאי להוסיף אותם בלשונית "ארסנל" כדי לקבל המלצות על החלפת כדור.</p>`}
     <label>אולם</label><input type="text" id="sCenter" value="${esc(db.settings.center)}" placeholder="שם האולם">
     <label>סוג</label>
-    <div class="seg" id="sType"><button data-v="training">אימון</button><button data-v="league">ליגה</button><button data-v="tournament">תחרות</button></div>
+    <div class="seg" id="sType"><button data-v="training">אימון</button><button data-v="league">ליגה</button><button data-v="tournament">תחרות</button><button data-v="warmonly">חימום בלבד</button></div>
     <label>חימום לפני המשחק</label>
     <div class="seg" id="sWarm"><button data-v="1">כן, עם המלצות</button><button data-v="0">בלי חימום</button></div>
     <label>המלצות בזמן משחק</label>
@@ -93,7 +89,7 @@ function renderStart(root) {
     sync();
   };
   const tipsNote = () => { $('#tipsNote', root).textContent = f.liveTips ? '' : 'במצב רישום בלבד האפליקציה רק רושמת, בלי טיפים תוך כדי משחק. הקריאה המלאה נפתחת בסיום. בליגה ובתחרות כדאי לבדוק מול התקנון או האיגוד אם מותר להשתמש בטלפון לייעוץ.'; };
-  $('#sType', root).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; f.liveTips = b.dataset.v === 'training'; f.warmup = !f.liveTips; root.querySelectorAll('#sTips button').forEach(x => x.classList.toggle('on', (x.dataset.v === '1') === f.liveTips)); root.querySelectorAll('#sWarm button').forEach(x => x.classList.toggle('on', (x.dataset.v === '1') === f.warmup)); tipsNote(); });
+  $('#sType', root).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; f.liveTips = b.dataset.v === 'training'; f.warmup = !f.liveTips; if (b.dataset.v === 'warmonly') toast('חימום בלבד: זורקים בשני המסלולים עם המלצות, ובסוף מקבלים תוכנית לכל מסלול ושליף להזזות בליגה.', 5000); root.querySelectorAll('#sTips button').forEach(x => x.classList.toggle('on', (x.dataset.v === '1') === f.liveTips)); root.querySelectorAll('#sWarm button').forEach(x => x.classList.toggle('on', (x.dataset.v === '1') === f.warmup)); tipsNote(); });
   bindSeg('sType', 'type'); bindSeg('sOil', 'oil'); bindSeg('sTips', 'liveTips', v => v === '1'); bindSeg('sWarm', 'warmup', v => v === '1');
   $('#sTips', root).addEventListener('click', tipsNote); tipsNote();
   const bindSet = (id, key) => {
@@ -110,7 +106,7 @@ function renderStart(root) {
     S.setPattern(S.currentSession(), readPattern(root));
     entryKey = '';
     renderPlay();
-    toast(f.liveTips ? 'האימון התחיל. בלשונית <b>קריאה</b> מחכה לך עצה לפתיחה לפי מצב השימון 👀' : 'מצב רישום בלבד. בהצלחה! הקריאה תיפתח בסיום.');
+    toast(f.type === 'warmonly' ? '🔥 חימום בלבד. זרוק בשני המסלולים, ובסוף לחץ "סיימתי חימום".' : f.liveTips ? 'האימון התחיל. בלשונית <b>קריאה</b> מחכה לך עצה לפתיחה לפי מצב השימון 👀' : 'מצב רישום בלבד. בהצלחה! הקריאה תיפתח בסיום.');
   };
 }
 
@@ -282,7 +278,7 @@ export function renderPlay() {
   const balls = S.getDb().balls;
   const unit = S.getDb().settings.speedUnit === 'mph' ? 'מייל' : 'קמ"ש';
   root.innerHTML = `
-    ${warm ? `<div class="card warmbar"><b>🔥 חימום</b> · ${shots.length} זריקות · ההמלצות פעילות<button class="btn pri sm" id="warmDone">סיימתי חימום ←</button></div>` : scoreboard(shots, s, ctx.frame)}
+    ${warm ? `<div class="card warmbar"><b>🔥 חימום</b> · ${shots.length} זריקות · ההמלצות פעילות<button class="btn pri sm" id="warmDone">${s.type === 'warmonly' ? 'סיימתי, תן תוכנית ←' : 'סיימתי חימום ←'}</button></div>` : scoreboard(shots, s, ctx.frame)}
     <div class="shothead">
       <div><div class="title">${warm ? `זריקת חימום ${ctx.frame + 1}` : `פריים ${ctx.frame + 1} · ${['כדור ראשון', 'כדור שני', 'כדור שלישי'][ctx.shot]}${isFirst ? '' : ' (ספייר)'}`}</div>
       <div class="mute">${warm ? 'רק כדור ראשון, בלי ניקוד' : `משחק ${game + 1}`}</div></div>
@@ -460,23 +456,17 @@ function saveShot(s, ctx, game) {
 
 // ---------- סיום חימום: תוכנית פתיחה ----------
 function renderWarmEnd(root, s) {
-  const hand = S.getDb().settings.hand;
+  const hand = S.getDb().settings.hand, only = s.type === 'warmonly';
   const segShots = S.sessionShots(s.id).filter(x => (x.seg ?? 0) === S.curSegIdx(s));
   const plan = { L: openingPlan(segShots, 'L', hand, s), R: openingPlan(segShots, 'R', hand, s) };
-  const card = lane => {
-    const p = plan[lane], b = S.ballById(p.ball);
-    return `<div class="card"><h3>מסלול ${laneName(s, lane)}</h3>
-      <div class="stats"><div class="stat"><div class="v">${p.stance}${p.cm ? `<small> +${p.cm}</small>` : ''}</div><div class="k">עמידה</div></div>
-      <div class="stat"><div class="v">${arrowNum(p.arrow) ? `חץ ${arrowNum(p.arrow)}` : p.arrow}</div><div class="k">בורד ${p.arrow}</div></div>
-      <div class="stat"><div class="v" style="font-size:.95rem">${esc(b?.name || '—')}</div><div class="k">כדור</div></div></div>
-      <p style="line-height:1.5">${esc(p.reason)}</p>
-      ${p.oil ? `<p class="mute">אורך שימון משוער: ~${p.oil.len} רגל (ביטחון ${p.oil.conf})</p>` : ''}
-      <p class="mute">${p.n} זריקות חימום במסלול הזה.</p></div>`;
+  root.innerHTML = `<div class="card"><h2>📋 ${only ? 'התוכנית לליגה' : 'תוכנית פתיחה'}</h2><p class="mute">${only ? 'זה מה שהחימום לימד אותנו. התוכנית נשמרת, ותמצא אותה בלשונית "קריאה" ובהיסטוריה. בליגה עצמה אפשר לעבוד רק מהשליף, בלי לרשום.' : `זה מה שהחימום לימד אותנו. המספרים ייכנסו אוטומטית לזריקה הראשונה בכל מסלול.${s.liveTips === false ? ' מכאן והלאה: רישום בלבד, בלי המלצות.' : ''}`}</p></div>
+    ${planCards(s, plan)}
+    <div class="actions"><button class="btn pri full big" id="goGame">${only ? '✓ שמור תוכנית וסיים' : 'מתחילים משחק 1'}</button><button class="btn full sm" id="backWarm">↩︎ עוד זריקות חימום</button></div>`;
+  $('#goGame').onclick = () => {
+    s.plan = plan; s.phase = 'play';
+    if (only) { const db = S.getDb(); db.viewSessionId = s.id; db.currentSessionId = null; S.save(); go('read'); toast('התוכנית נשמרה. בהצלחה בליגה! 🎳'); return; }
+    S.save(); entryKey = ''; renderPlay(); toast('בהצלחה! 🎳');
   };
-  root.innerHTML = `<div class="card"><h2>📋 תוכנית פתיחה</h2><p class="mute">זה מה שהחימום לימד אותנו. המספרים ייכנסו אוטומטית לזריקה הראשונה בכל מסלול.${s.liveTips === false ? ' מכאן והלאה: רישום בלבד, בלי המלצות.' : ''}</p></div>
-    ${card('L')}${card('R')}
-    <div class="actions"><button class="btn pri full big" id="goGame">מתחילים משחק 1</button><button class="btn full sm" id="backWarm">↩︎ עוד זריקות חימום</button></div>`;
-  $('#goGame').onclick = () => { s.plan = plan; s.phase = 'play'; S.save(); entryKey = ''; renderPlay(); toast('בהצלחה! 🎳'); };
   $('#backWarm').onclick = () => renderPlay();
 }
 

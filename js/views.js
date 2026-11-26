@@ -2,13 +2,13 @@
 import * as S from './store.js';
 import { laneStats, oilEstimate, oilLabel, insights, compareLanes, startAdvice, LEAVE_LABEL, sourceOf, SRC_LABEL, measuredDrift } from './analysis.js';
 import { esc, go, toast, renderPlay } from './app.js';
-import { LEARN_HTML } from './learn.js';
+import { LEARN_HTML } from './learn.js'; import { planCards } from './warmplan.js';
 import { TERMS_LIST, TERMS_SHORT } from './terms.js';
 import { arrowNum, MOVE_INFO, geometry } from './geometry.js';
 import { registerRecs, learnedSummary, KIND_LABEL } from './learnloop.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
-export const APP_VERSION = '2.3';
+export const APP_VERSION = '2.4';
 let readScope = 'seg';   // seg | session
 let unlocked = null;     // מזהה אימון שנפתח למרות מצב רישום בלבד
 
@@ -47,6 +47,7 @@ export function renderRead() {
     <div class="mute">${new Date(s.date).toLocaleDateString('he-IL')} · ${esc(s.center)} · ${S.OIL_LABEL[seg.oil]}</div></div></div>
     ${(s.segs?.length || 1) > 1 ? `<div class="seg" id="scope" style="margin-top:10px"><button data-v="seg" class="${readScope === 'seg' ? 'on' : ''}">מסלולים נוכחיים</button><button data-v="session" class="${readScope === 'session' ? 'on' : ''}">כל האימון</button></div>` : ''}
   </div>`;
+  if (s.type === 'warmonly' && s.plan) html += `<h3>📋 התוכנית לליגה</h3>${planCards(s, s.plan)}`;
 
   // עצת פתיחה, כל עוד יש מעט זריקות בקטע
   if (live && shots.filter(x => x.shot === 0).length < 6) {
@@ -274,7 +275,7 @@ export function renderMore() {
       const games = Array.from({ length: s.games }, (_, g) => S.scoreGame(S.gameShots(s.id, g)).total).filter(Boolean);
       return `<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:8px 0" data-id="${s.id}">
         <div class="grow"><b>${new Date(s.date).toLocaleDateString('he-IL')}</b> · ${esc(s.center)}${s.id === db.currentSessionId ? ' <span style="color:var(--acc)">(פעיל)</span>' : ''}
-        <div class="mute">${(s.segs || []).map(g => `${g.laneNums.L}|${g.laneNums.R} ${S.OIL_LABEL[g.oil]}`).join(' → ')} · משחקים: ${games.join(', ') || '—'}${S.sessionShots(s.id).some(x => x.drill) ? ' · 🧪 כולל תרגול טכניקה' : ''}</div></div>
+        <div class="mute">${(s.segs || []).map(g => `${g.laneNums.L}|${g.laneNums.R} ${S.OIL_LABEL[g.oil]}`).join(' → ')} · משחקים: ${games.join(', ') || '—'}${S.sessionShots(s.id).some(x => x.drill) ? ' · 🧪 כולל תרגול טכניקה' : ''}${s.type === 'warmonly' ? ' · 🔥 חימום בלבד' : ''}</div></div>
         <button class="btn sm view">קריאה</button><button class="btn sm danger del">🗑</button></div>`;
     }).join('') : '<p class="mute">עוד אין אימונים.</p>'}</div>
     <div class="card"><h2>📲 העברה למכשיר אחר</h2>
